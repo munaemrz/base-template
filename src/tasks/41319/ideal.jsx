@@ -1,165 +1,185 @@
 import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
 
-function shuffleArray() {
-  let array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, ""];
-  for (let i = array.length - 1; i > 0; i--) {
-    let j = Math.floor(Math.random() * (i + 1)); // Randomly pick a tile
-    [array[i], array[j]] = [array[j], array[i]]; // Swap the tiles
-  }
-  return array;
+const difficulties = {
+  easy: { timeLimit: 120, maxNumber: 8 },
+  medium: { timeLimit: 90, maxNumber: 12 },
+  hard: { timeLimit: 60, maxNumber: 16 },
+};
+
+function Cell({ value, isRevealed, onClick }) {
+  return (
+    <button
+      className={`w-12 h-12 border text-center text-lg ${
+        isRevealed ? "bg-blue-300" : "bg-gray-100"
+      }`}
+      onClick={onClick}
+    >
+      {isRevealed ? value : "?"}
+    </button>
+  );
 }
 
-function Timer({ time, setTime, timerActive }) {
-  useEffect(() => {
-    let interval = null;
-    if (timerActive) {
-      interval = setInterval(() => {
-        setTime((time) => time + 1); // Increment the time every second
-      }, 1000);
-    } else {
-      clearInterval(interval); // Stop the timer when inactive
-    }
-    return () => clearInterval(interval); // Cleanup on unmount
-  }, [timerActive]);
-
-  return <p>Time: {time}s</p>;
-}
-
-function FilledTile({ index, value, dragStart }) {
+function GameGrid({ grid, revealed, handleCellClick }) {
   return (
     <div
-      id={`place-${index + 1}`} // Corrected here
-      className={`shadow w-20 h-20 flex items-center justify-center rounded cursor-pointer ${
-        index === value - 1
-          ? "bg-gradient-to-r from-pink-500 to-yellow-500"
-          : "bg-gray-900"
-      }`}
+      className="grid gap-2"
+      style={{ gridTemplateColumns: `repeat(${grid[0].length}, 1fr)` }}
     >
-      <p
-        id={`tile-${value}`} // Corrected here
-        draggable="true"
-        onDragStart={dragStart}
-        className="text-xl text-white"
-      >
-        {value}
-      </p>
+      {grid.map((row, rowIndex) =>
+        row.map((cell, colIndex) => (
+          <Cell
+            key={`${rowIndex}-${colIndex}`}
+            value={cell}
+            isRevealed={revealed[rowIndex][colIndex]}
+            onClick={() => handleCellClick(rowIndex, colIndex)}
+          />
+        ))
+      )}
     </div>
   );
 }
 
-function EmptyTile({ dragOver, dropped, index }) {
-  return (
-    <div
-      onDragOver={dragOver}
-      onDrop={dropped}
-      id={`place-${index + 1}`} // Corrected here
-      className="bg-gray-900 shadow w-20 h-20 rounded"
-    ></div>
-  );
-}
-
-function App() {
-  const [shuffledArray, setShuffledArray] = useState(shuffleArray());
-  const [moves, setMoves] = useState(0);
-  const [time, setTime] = useState(0);
-  const [timerActive, setTimerActive] = useState(false);
-  const [win, setWin] = useState(false);
-
-  const newGame = () => {
-    setMoves(0);
-    setTime(0);
-    setTimerActive(false);
-  };
+export default function App() {
+  const [gridSize, setGridSize] = useState({ rows: 4, cols: 4 });
+  const [difficulty, setDifficulty] = useState("easy");
+  const [grid, setGrid] = useState([]);
+  const [revealed, setRevealed] = useState([]);
+  const [selected, setSelected] = useState([]);
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [gameState, setGameState] = useState("setup");
 
   useEffect(() => {
-    if (moves === 1) setTimerActive(true); // Start the timer when first move is made
-    let won = true;
-    for (let i = 0; i < shuffledArray.length - 1; i++) {
-      const value = shuffledArray[i];
-      if (i !== value - 1) {
-        won = false;
-        break;
+    if (gameState === "playing") {
+      if (timeLeft > 0) {
+        const timer = setInterval(() => {
+          setTimeLeft((prev) => prev - 1);
+        }, 1000);
+        return () => clearInterval(timer);
+      } else {
+        setGameState("lost");
       }
     }
-    if (won) {
-      setWin(true);
-      setTimerActive(false); // Stop the timer when game is won
-    }
-  }, [moves]);
+  }, [gameState, timeLeft]);
 
-  const dragStart = (e) => e.dataTransfer.setData("tile", e.target.id); // Handle drag start
-  const dragOver = (e) => e.preventDefault(); // Allow dropping tiles
-  const dropped = (e) => {
-    e.preventDefault();
-    const tile = e.dataTransfer.getData("tile");
-    const oldPlace =
-      Number(document.getElementById(tile)?.parentElement?.id.slice(6)) - 1;
-    const newPlace = Number(e.target.id.slice(6)) - 1;
+  const generateGrid = () => {
+    const maxNumber = difficulties[difficulty].maxNumber;
+    const numbers = Array.from(
+      { length: (gridSize.rows * gridSize.cols) / 2 },
+      (_, i) => (i % maxNumber) + 1
+    );
+    const shuffledNumbers = [...numbers, ...numbers].sort(
+      () => Math.random() - 0.5
+    );
 
-    if (
-      !(
-        Math.abs(oldPlace - newPlace) === 4 ||
-        Math.abs(oldPlace - newPlace) === 1
+    return Array.from({ length: gridSize.rows }, (_, i) =>
+      shuffledNumbers.slice(i * gridSize.cols, (i + 1) * gridSize.cols)
+    );
+  };
+
+  const startGame = () => {
+    setGrid(generateGrid());
+    setRevealed(
+      Array.from({ length: gridSize.rows }, () =>
+        Array(gridSize.cols).fill(false)
       )
-    )
-      return;
+    );
+    setSelected([]);
+    setScore(0);
+    setTimeLeft(difficulties[difficulty].timeLimit); // Properly set the timer based on difficulty
+    setGameState("playing");
+  };
 
-    const [i, j] = [Math.min(oldPlace, newPlace), Math.max(oldPlace, newPlace)];
-    setShuffledArray([
-      ...shuffledArray.slice(0, i),
-      shuffledArray[j],
-      ...shuffledArray.slice(i + 1, j),
-      shuffledArray[i],
-      ...shuffledArray.slice(j + 1),
-    ]);
-    setMoves(moves + 1);
+  const handleCellClick = (row, col) => {
+    if (gameState !== "playing" || revealed[row][col]) return;
+
+    const updatedRevealed = [...revealed];
+    updatedRevealed[row][col] = true;
+    setRevealed(updatedRevealed);
+
+    const updatedSelected = [...selected, { row, col }];
+    setSelected(updatedSelected);
+
+    if (updatedSelected.length === 2) {
+      const [first, second] = updatedSelected;
+      if (grid[first.row][first.col] === grid[second.row][second.col]) {
+        setScore((prev) => prev + 10);
+        if (updatedRevealed.flat().every((cell) => cell)) {
+          setGameState("won");
+        }
+      } else {
+        setTimeout(() => {
+          updatedRevealed[first.row][first.col] = false;
+          updatedRevealed[second.row][second.col] = false;
+          setRevealed(updatedRevealed);
+          setScore((prev) => Math.max(0, prev - 5));
+        }, 1000);
+      }
+      setSelected([]);
+    }
   };
 
   return (
-    <div className="h-screen flex text-gray-300 bg-gray-950">
-      <div className="mx-auto mt-8">
-        {win && (
-          <div className="rounded-md border-l-4 border-green-500 bg-green-100 p-2 mb-2">
-            <div className="flex items-center justify-center space-x-4">
-              <p className="font-medium text-green-600">
-                HURRAY!! You have won the game
-              </p>
-            </div>
+    <div className="container mx-auto p-4 max-w-md">
+      <h1 className="text-2xl font-bold mb-4">Puzzle Grid Game</h1>
+      {gameState === "setup" && (
+        <div className="space-y-4">
+          <Input
+            type="number"
+            value={gridSize.rows}
+            onChange={(e) =>
+              setGridSize((prev) => ({ ...prev, rows: +e.target.value }))
+            }
+          />
+          <Select onValueChange={setDifficulty} defaultValue={difficulty}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Difficulty" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="easy">Easy</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="hard">Hard</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={startGame}>Start Game</Button>
+        </div>
+      )}
+      {gameState === "playing" && (
+        <div>
+          <GameGrid
+            grid={grid}
+            revealed={revealed}
+            handleCellClick={handleCellClick}
+          />
+          <div>Score: {score}</div>
+          <div>Time Left: {timeLeft}s</div>
+        </div>
+      )}
+      {gameState === "won" && (
+        <div>
+          <div className="text-green-600 font-bold text-center mb-4">
+            You won!
           </div>
-        )}
-        <h1 className="text-3xl text-emerald-600 font-bold text-center">
-          15 Puzzle Game
-        </h1>
-        <div className="flex justify-between px-6 mt-2">
-          <p>Moves: {moves}</p>
-          <Timer time={time} timerActive={timerActive} setTime={setTime} />
+          <Button onClick={() => setGameState("setup")}>Play Again</Button>
         </div>
-        <div className="grid grid-cols-4 gap-2 mt-6 px-6 rounded">
-          {shuffledArray.map((value, index) => {
-            if (value === "")
-              return (
-                <EmptyTile
-                  dragOver={dragOver}
-                  dropped={dropped}
-                  index={index}
-                />
-              );
-            return (
-              <FilledTile index={index} value={value} dragStart={dragStart} />
-            );
-          })}
+      )}
+      {gameState === "lost" && (
+        <div>
+          <div className="text-red-600 font-bold text-center mb-4">
+            Try again!
+          </div>
+          <Button onClick={() => setGameState("setup")}>Play Again</Button>
         </div>
-        <div className="px-6 mt-4">
-          <button
-            onClick={newGame}
-            className="text-black font-bold block bg-gray-900 p-2 rounded w-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"
-          >
-            New Game
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
-
-export default App;

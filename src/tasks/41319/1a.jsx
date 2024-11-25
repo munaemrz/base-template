@@ -1,239 +1,162 @@
-import React, { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import React, { useState, useEffect } from 'react';
+import { Button, Input, Select, SelectItem } from "@shadcn/ui";
 
-const difficulties = {
-  easy: { mines: 0.1, time: 120 },
-  medium: { mines: 0.2, time: 180 },
-  hard: { mines: 0.3, time: 240 },
+const DIFFICULTY = {
+  easy: { time: 120, grid: 4 },
+  medium: { time: 180, grid: 6 },
+  hard: { time: 240, grid: 8 },
 };
 
-function Cell({ value, revealed, flagged, onClick, onContextMenu }) {
-  const cellClass = `w-8 h-8 border border-gray-300 flex items-center justify-center cursor-pointer ${
-    revealed ? "bg-gray-200" : "bg-white hover:bg-gray-100"
-  }`;
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
 
+function generateNumbers(size) {
+  const numbers = Array.from({ length: (size * size) / 2 }, (_, i) => i + 1);
+  return shuffleArray([...numbers, ...numbers]);
+}
+
+function Cell({ number, onClick, revealed }) {
   return (
-    <div className={cellClass} onClick={onClick} onContextMenu={onContextMenu}>
-      {revealed && value !== 0 && value !== "X" && value}
-      {revealed && value === "X" && "💣"}
-      {!revealed && flagged && "🚩"}
-    </div>
+    <Button 
+      variant={revealed ? "default" : "ghost"} 
+      className={`h-16 w-16 sm:h-20 sm:w-20 justify-center items-center ${revealed ? 'bg-green-200' : ''}`}
+      onClick={onClick}
+    >
+      {revealed ? number : ''}
+    </Button>
   );
 }
 
-function Grid({ grid, revealCell, flagCell }) {
+function GameBoard({ size, onEndGame }) {
+  const [board, setBoard] = useState([]);
+  const [firstPick, setFirstPick] = useState(null);
+  const [secondPick, setSecondPick] = useState(null);
+  const [score, setScore] = useState(0);
+  const [attempts, setAttempts] = useState(0);
+
+  useEffect(() => {
+    resetBoard();
+  }, [size]);
+
+  const resetBoard = () => {
+    const numbers = generateNumbers(size);
+    setBoard(numbers.map((num, index) => ({ id: index, number: num, revealed: false })));
+    setFirstPick(null);
+    setSecondPick(null);
+    setScore(0);
+    setAttempts(0);
+  };
+
+  const handleCellClick = (cell) => {
+    if (cell.revealed || (firstPick && secondPick)) return;
+
+    const updatedBoard = board.map(c => 
+      c.id === cell.id ? { ...c, revealed: true } : c
+    );
+
+    if (!firstPick) {
+      setFirstPick(cell);
+    } else if (!secondPick) {
+      setSecondPick(cell);
+      setAttempts(attempts + 1);
+      if (firstPick.number === cell.number) {
+        setScore(score + 10);
+        if (updatedBoard.every(c => c.revealed)) {
+          onEndGame(true, attempts);
+        }
+      } else {
+        setTimeout(() => {
+          setBoard(prev => prev.map(c => 
+            c.id === firstPick.id || c.id === cell.id ? { ...c, revealed: false } : c
+          ));
+          setFirstPick(null);
+          setSecondPick(null);
+        }, 1000);
+        setScore(score - 2);
+      }
+    }
+
+    setBoard(updatedBoard);
+  };
+
   return (
-    <div
-      className="grid gap-1"
-      style={{
-        gridTemplateColumns: `repeat(${grid[0].length}, minmax(0, 1fr))`,
-      }}
-    >
-      {grid.map((row, i) =>
-        row.map((cell, j) => (
-          <Cell
-            key={`${i}-${j}`}
-            value={cell.value}
-            revealed={cell.revealed}
-            flagged={cell.flagged}
-            onClick={() => revealCell(i, j)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              flagCell(i, j);
-            }}
-          />
-        ))
-      )}
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(40px,1fr))] gap-2">
+      {board.map(cell => (
+        <Cell key={cell.id} number={cell.number} revealed={cell.revealed} onClick={() => handleCellClick(cell)} />
+      ))}
     </div>
   );
 }
 
 export default function App() {
-  const [rows, setRows] = useState(8);
-  const [cols, setCols] = useState(8);
-  const [difficulty, setDifficulty] = useState("easy");
-  const [grid, setGrid] = useState([]);
-  const [gameState, setGameState] = useState("setup"); // setup, playing, won, lost
-  const [time, setTime] = useState(0);
-  const [score, setScore] = useState(0);
+  const [rows, setRows] = useState(4);
+  const [cols, setCols] = useState(4);
+  const [difficulty, setDifficulty] = useState('easy');
+  const [time, setTime] = useState(DIFFICULTY.easy.time);
+  const [running, setRunning] = useState(false);
+  const [gameOver, setGameOver] = useState({ status: false, won: false, attempts: 0 });
 
   useEffect(() => {
-    let timer;
-    if (gameState === "playing") {
-      timer = setInterval(() => {
-        setTime((prevTime) => prevTime + 1);
+    setTime(DIFFICULTY[difficulty].time);
+  }, [difficulty]);
+
+  useEffect(() => {
+    let interval = null;
+    if (running && time > 0) {
+      interval = setInterval(() => {
+        setTime(prevTime => prevTime - 1);
       }, 1000);
+    } else if (time === 0) {
+      setRunning(false);
+      setGameOver({ status: true, won: false, attempts: 0 });
     }
-    return () => clearInterval(timer);
-  }, [gameState]);
+    return () => clearInterval(interval);
+  }, [running, time]);
 
-  const initializeGrid = () => {
-    const newGrid = Array(rows)
-      .fill()
-      .map(() =>
-        Array(cols)
-          .fill()
-          .map(() => ({ value: 0, revealed: false, flagged: false }))
-      );
-
-    const numMines = Math.floor(rows * cols * difficulties[difficulty].mines);
-    let minesPlaced = 0;
-
-    while (minesPlaced < numMines) {
-      const row = Math.floor(Math.random() * rows);
-      const col = Math.floor(Math.random() * cols);
-      if (newGrid[row][col].value !== "X") {
-        newGrid[row][col].value = "X";
-        minesPlaced++;
-
-        for (let i = -1; i <= 1; i++) {
-          for (let j = -1; j <= 1; j++) {
-            if (
-              row + i >= 0 &&
-              row + i < rows &&
-              col + j >= 0 &&
-              col + j < cols &&
-              newGrid[row + i][col + j].value !== "X"
-            ) {
-              newGrid[row + i][col + j].value++;
-            }
-          }
-        }
-      }
-    }
-
-    setGrid(newGrid);
-    setGameState("playing");
-    setTime(0);
-    setScore(0);
+  const startGame = () => {
+    setRunning(true);
+    setGameOver({ status: false, won: false, attempts: 0 });
   };
 
-  const revealCell = (row, col) => {
-    if (gameState !== "playing") return;
-
-    const newGrid = [...grid];
-    if (newGrid[row][col].revealed || newGrid[row][col].flagged) return;
-
-    newGrid[row][col].revealed = true;
-
-    if (newGrid[row][col].value === "X") {
-      setGameState("lost");
-    } else {
-      setScore((prevScore) => prevScore + 1);
-
-      if (newGrid[row][col].value === 0) {
-        for (let i = -1; i <= 1; i++) {
-          for (let j = -1; j <= 1; j++) {
-            if (
-              row + i >= 0 &&
-              row + i < rows &&
-              col + j >= 0 &&
-              col + j < cols
-            ) {
-              revealCell(row + i, col + j);
-            }
-          }
-        }
-      }
-    }
-
-    setGrid(newGrid);
-
-    if (checkWin(newGrid)) {
-      setGameState("won");
-    }
+  const handleEndGame = (won, attempts) => {
+    setRunning(false);
+    setGameOver({ status: true, won, attempts });
   };
 
-  const flagCell = (row, col) => {
-    if (gameState !== "playing") return;
-
-    const newGrid = [...grid];
-    if (newGrid[row][col].revealed) return;
-
-    newGrid[row][col].flagged = !newGrid[row][col].flagged;
-    setGrid(newGrid);
-  };
-
-  const checkWin = (grid) => {
-    return grid.every((row) =>
-      row.every(
-        (cell) => cell.revealed || (cell.value === "X" && !cell.revealed)
-      )
-    );
-  };
-
-  const resetGame = () => {
-    setGameState("setup");
-    setGrid([]);
-    setTime(0);
-    setScore(0);
-  };
+  const gridSize = difficulty === 'easy' ? 4 : difficulty === 'medium' ? 6 : 8;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
-      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-bold mb-4">Puzzle Grid Game</h1>
-
-        {gameState === "setup" && (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="rows">Rows</Label>
-              <Input
-                id="rows"
-                type="number"
-                value={rows}
-                onChange={(e) => setRows(parseInt(e.target.value))}
-                min="5"
-                max="20"
-              />
-            </div>
-            <div>
-              <Label htmlFor="cols">Columns</Label>
-              <Input
-                id="cols"
-                type="number"
-                value={cols}
-                onChange={(e) => setCols(parseInt(e.target.value))}
-                min="5"
-                max="20"
-              />
-            </div>
-            <div>
-              <Label htmlFor="difficulty">Difficulty</Label>
-              <Select
-                id="difficulty"
-                value={difficulty}
-                onValueChange={setDifficulty}
-              >
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </Select>
-            </div>
-            <Button onClick={initializeGrid}>Start Game</Button>
-          </div>
-        )}
-
-        {gameState !== "setup" && (
-          <div className="space-y-4">
-            <div className="flex justify-between">
-              <div>Time: {time}s</div>
-              <div>Score: {score}</div>
-            </div>
-            <Grid grid={grid} revealCell={revealCell} flagCell={flagCell} />
-            {gameState === "won" && (
-              <div className="text-green-600 font-bold">You won!</div>
-            )}
-            {gameState === "lost" && (
-              <div className="text-red-600 font-bold">Try again!</div>
-            )}
-            <Button onClick={resetGame}>Reset Game</Button>
-          </div>
-        )}
-      </div>
+    <div className="flex flex-col items-center p-4 space-y-4">
+      <h1 className="text-2xl font-bold">Number Match Puzzle</h1>
+      {!running && !gameOver.status && (
+        <div className="space-y-2">
+          <Input type="number" placeholder="Rows" value={rows} onChange={(e) => setRows(Number(e.target.value))} />
+          <Input type="number" placeholder="Columns" value={cols} onChange={(e) => setCols(Number(e.target.value))} />
+          <Select onValueChange={setDifficulty}>
+            <SelectItem value="easy">Easy</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="hard">Hard</SelectItem>
+          </Select>
+          <Button onClick={startGame}>Start Game</Button>
+        </div>
+      )}
+      {running && (
+        <div>
+          <div>Time: {time}s</div>
+          <GameBoard size={gridSize} onEndGame={handleEndGame} />
+        </div>
+      )}
+      {gameOver.status && (
+        <div>
+          {gameOver.won ? `You won! Attempts: ${gameOver.attempts}` : 'Time's up! Try again!'}
+          <Button onClick={startGame}>Play Again</Button>
+        </div>
+      )}
     </div>
   );
 }
