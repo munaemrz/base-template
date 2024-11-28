@@ -1,93 +1,143 @@
 import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog } from "@/components/ui/dialog";
 
-const TicTacToe = () => {
-  const [board, setBoard] = useState(Array(9).fill(null));
-  const [xIsNext, setXIsNext] = useState(true);
-  const [winner, setWinner] = useState(null);
-  const [winningCombination, setWinningCombination] = useState([]);
+export default function App() {
+  const [recipes, setRecipes] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentRecipe, setCurrentRecipe] = useState({
+    name: "",
+    ingredients: "",
+    instructions: "",
+    tags: "",
+  });
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const calculateWinner = (squares) => {
-    const lines = [
-      [0, 1, 2],
-      [3, 4, 5],
-      [6, 7, 8],
-      [0, 3, 6],
-      [1, 4, 7],
-      [2, 5, 8],
-      [0, 4, 8],
-      [2, 4, 6],
-    ];
-    for (let [a, b, c] of lines) {
-      if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-        setWinningCombination([a, b, c]);
-        return squares[a];
-      }
+  const isFormValid =
+    currentRecipe.name.trim() &&
+    currentRecipe.ingredients.trim() &&
+    currentRecipe.instructions.trim();
+
+  const handleAddOrUpdateRecipe = () => {
+    if (!isFormValid) return;
+
+    if (currentRecipe.id) {
+      setRecipes((prev) =>
+        prev.map((r) => (r.id === currentRecipe.id ? currentRecipe : r))
+      );
+    } else {
+      setRecipes((prev) => [
+        ...prev,
+        { ...currentRecipe, id: Date.now(), tags: parseTags(currentRecipe.tags) },
+      ]);
     }
-    return squares.every(Boolean) ? "Draw" : null;
+    resetForm();
   };
 
-  const handleClick = (index) => {
-    if (winner || board[index]) return;
-
-    const newBoard = [...board];
-    newBoard[index] = xIsNext ? "X" : "O";
-    setBoard(newBoard);
-    setXIsNext(!xIsNext);
-
-    const gameWinner = calculateWinner(newBoard);
-    setWinner(gameWinner);
+  const handleEditRecipe = (recipe) => {
+    setCurrentRecipe({
+      ...recipe,
+      tags: recipe.tags.join(", "),
+    });
+    setDialogOpen(true);
   };
 
-  const restartGame = () => {
-    setBoard(Array(9).fill(null));
-    setXIsNext(true);
-    setWinner(null);
-    setWinningCombination([]);
+  const handleDeleteRecipe = (id) => {
+    setRecipes((prev) => prev.filter((recipe) => recipe.id !== id));
   };
 
-  const renderCell = (index) => (
-    <button
-      key={index}
-      className={`w-full h-24 text-4xl font-bold border-2 border-gray-300 
-        ${winningCombination.includes(index) ? "bg-green-200 animate-pulse" : "hover:bg-gray-100"}
-        ${board[index] ? "cursor-not-allowed" : ""}`}
-      onClick={() => handleClick(index)}
-    >
-      {board[index]}
-    </button>
+  const resetForm = () => {
+    setCurrentRecipe({
+      name: "",
+      ingredients: "",
+      instructions: "",
+      tags: "",
+    });
+    setDialogOpen(false);
+  };
+
+  const parseTags = (tags) =>
+    tags.split(",").map((tag) => tag.trim()).filter((tag) => tag);
+
+  const filteredRecipes = recipes.filter((recipe) =>
+    [recipe.name, ...recipe.tags].some((field) =>
+      field.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">Tic-Tac-Toe</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {board.map((_, index) => renderCell(index))}
+    <div className="container mx-auto p-4 sm:p-6">
+      <h1 className="text-2xl font-bold mb-4">Recipe Organizer</h1>
+      <Input
+        placeholder="Search recipes or tags..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="mb-4"
+      />
+      <Button
+        onClick={() => {
+          setDialogOpen(true);
+          resetForm();
+        }}
+        className="mb-4"
+      >
+        Add Recipe
+      </Button>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {filteredRecipes.map((recipe) => (
+          <div key={recipe.id} className="p-4 border rounded shadow">
+            <h2 className="text-xl font-bold mb-2">{recipe.name}</h2>
+            <p className="text-sm">Tags: {recipe.tags.join(", ")}</p>
+            <div className="mt-4 flex space-x-2">
+              <Button onClick={() => handleEditRecipe(recipe)}>Edit</Button>
+              <Button variant="destructive" onClick={() => handleDeleteRecipe(recipe.id)}>
+                Delete
+              </Button>
+            </div>
           </div>
-          <div className="text-center mb-4">
-            {winner ? (
-              <p className="text-xl font-semibold">
-                {winner === "Draw" ? "It's a draw!" : `Winner: ${winner}`}
-              </p>
-            ) : (
-              <p className="text-xl font-semibold">Next player: {xIsNext ? "X" : "O"}</p>
-            )}
-          </div>
+        ))}
+      </div>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <div className="p-4 space-y-4">
+          <Input
+            placeholder="Recipe Name"
+            value={currentRecipe.name}
+            onChange={(e) =>
+              setCurrentRecipe((prev) => ({ ...prev, name: e.target.value }))
+            }
+          />
+          <Textarea
+            placeholder="Ingredients (comma-separated)"
+            value={currentRecipe.ingredients}
+            onChange={(e) =>
+              setCurrentRecipe((prev) => ({ ...prev, ingredients: e.target.value }))
+            }
+          />
+          <Textarea
+            placeholder="Instructions"
+            value={currentRecipe.instructions}
+            onChange={(e) =>
+              setCurrentRecipe((prev) => ({ ...prev, instructions: e.target.value }))
+            }
+          />
+          <Input
+            placeholder="Tags (comma-separated)"
+            value={currentRecipe.tags}
+            onChange={(e) =>
+              setCurrentRecipe((prev) => ({ ...prev, tags: e.target.value }))
+            }
+          />
           <Button
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors duration-300"
-            onClick={restartGame}
+            onClick={handleAddOrUpdateRecipe}
+            disabled={!isFormValid}
+            className="w-full"
           >
-            Restart Game
+            Save Recipe
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </Dialog>
     </div>
   );
 }
-
-export default TicTacToe;
