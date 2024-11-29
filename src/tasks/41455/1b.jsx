@@ -1,173 +1,131 @@
-import React, { useState, useRef } from "react";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 
-const FlowerPart = ({ part, onSelect }) => {
+const FlowerPart = ({ part, onSelect, selected, correct }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <TooltipProvider>
-      <Tooltip content={part.description}>
-        <g
-          onClick={() => onSelect(part)}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          className={`${
-            isHovered ? "cursor-pointer opacity-80" : "opacity-100"
-          } transition-opacity duration-300`}
-        >
-          <path d={part.path} fill={part.color} />
-        </g>
-      </Tooltip>
-    </TooltipProvider>
+   <TooltipProvider> <Tooltip content={part.name}>
+      <g
+        onClick={() => onSelect(part)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`${selected ? 'cursor-pointer fill-green-500' : 'cursor-pointer fill-blue-500'} ${isHovered ? 'opacity-75' : 'opacity-100'} transition-all`}
+      >
+        {part.path}
+      </g>
+    </Tooltip></TooltipProvider>
   );
 };
 
-const FlowerDiagram = ({ onPartSelect }) => (
-  <svg width="300" height="300" viewBox="0 0 300 300">
-    {flowerParts.map((part, index) => (
-      <FlowerPart key={index} part={part} onSelect={onPartSelect} />
-    ))}
-  </svg>
+const FlowerDescription = ({ part }) => (
+  <Card className="w-full max-w-sm">
+    <CardHeader>
+      <CardTitle>{part.name}</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <CardDescription>{part.description}</CardDescription>
+    </CardContent>
+  </Card>
 );
 
-const QuizLabel = ({ label, isCorrect, onDragStart }) => (
-  <div
-    draggable
+const QuizLabel = ({ label, onDragStart, isCorrect, isPlaced }) => (
+  <div 
+    draggable 
     onDragStart={(e) => onDragStart(e, label)}
-    className={`p-2 m-2 bg-blue-100 rounded cursor-move ${
-      isCorrect !== null ? (isCorrect ? "bg-green-200" : "bg-red-200") : ""
-    }`}
+    className={`px-4 py-2 m-2 rounded bg-white shadow-lg cursor-move ${isCorrect ? 'bg-green-100' : isPlaced ? 'bg-red-100' : ''}`}
   >
-    {label}
+    {label.name}
   </div>
 );
-
-const QuizMode = ({ labels, onDrop, onDragOver, checkAnswer }) => (
-  <div className="flex flex-col sm:flex-row items-center justify-center">
-    <div className="w-full sm:w-1/2 p-4">
-      <FlowerDiagram onPartSelect={() => {}} />
-      {flowerParts.map((part, index) => (
-        <div
-          key={index}
-          onDrop={(e) => onDrop(e, part.name)}
-          onDragOver={onDragOver}
-          className="absolute inset-0"
-          style={{ pointerEvents: "none" }}
-        />
-      ))}
-    </div>
-    <div className="w-full sm:w-1/2 flex flex-wrap justify-center">
-      {labels.map((label, idx) => (
-        <QuizLabel
-          key={idx}
-          label={label}
-          isCorrect={checkAnswer(label)}
-          onDragStart={onDragStart}
-        />
-      ))}
-    </div>
-  </div>
-);
-
-const flowerParts = [
-  {
-    name: "Petal",
-    path: "M50 100 Q100 50 150 100 T250 100",
-    color: "#ff69b4",
-    description: "Petals attract pollinators.",
-  },
-  {
-    name: "Stamen",
-    path: "M100 150 L100 200",
-    color: "#ffd700",
-    description: "The male part where pollen is produced.",
-  },
-  {
-    name: "Pistil",
-    path: "M150 150 L150 220",
-    color: "#98fb98",
-    description: "The female part where seeds develop.",
-  },
-  // Add more parts as needed
-];
 
 export default function App() {
+  const flowerParts = [
+    { name: "Petal", description: "Attracts pollinators.", path: <path d="M10 10 C 20 20, 40 20, 50 10" stroke="black" fill="transparent" strokeWidth="2"/> },
+    { name: "Stamen", description: "The male part where pollen is produced.", path: <circle cx="30" cy="30" r="5" /> },
+    { name: "Pistil", description: "The female reproductive part.", path: <rect x="40" y="25" width="10" height="20" /> },
+    { name: "Sepal", description: "Protects the flower bud.", path: <path d="M60 60 Q 65 50 70 60" stroke="green" fill="transparent" strokeWidth="2"/> },
+  ];
+
   const [selectedPart, setSelectedPart] = useState(null);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [quizMode, setQuizMode] = useState(false);
-  const [labels, setLabels] = useState(
-    flowerParts.map((part) => part.name).sort(() => Math.random() - 0.5)
-  );
-  const [answers, setAnswers] = useState({});
+  const [labels, setLabels] = useState(flowerParts.map(part => ({...part, placed: false, correct: false})));
+  const [feedback, setFeedback] = useState({correct: 0, total: flowerParts.length});
 
-  const onDragStart = (event, label) => {
-    event.dataTransfer.setData("text/plain", label);
+  const handlePartSelect = (part) => {
+    if (!quizMode) setSelectedPart(part);
   };
 
-  const onDrop = (event, partName) => {
-    event.preventDefault();
-    const label = event.dataTransfer.getData("text");
-    setAnswers((prev) => ({ ...prev, [partName]: label === partName }));
+  const handleDragStart = (e, label) => {
+    e.dataTransfer.setData('text/plain', JSON.stringify(label));
   };
 
-  const onDragOver = (event) => {
-    event.preventDefault();
+  const handleDrop = (e, part) => {
+    e.preventDefault();
+    const label = JSON.parse(e.dataTransfer.getData('text'));
+    const newLabels = labels.map(l => {
+      if (l.name === label.name) {
+        return {...l, placed: true, correct: l.name === part.name};
+      }
+      return l;
+    });
+    setLabels(newLabels);
+    const correctCount = newLabels.filter(l => l.correct).length;
+    setFeedback({correct: correctCount, total: newLabels.length});
   };
 
-  const checkAnswer = (label) =>
-    answers[label] === label ? true : answers[label] === false ? false : null;
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
 
   return (
-    <div className="flex flex-col items-center p-4 sm:p-8 space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Flower Anatomy</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {!quizMode ? (
-            <>
-              <FlowerDiagram onPartSelect={setSelectedPart} />
-              {selectedPart && (
-                <div>
-                  <h3 className="font-bold">{selectedPart.name}</h3>
-                  <p>{selectedPart.description}</p>
-                  <Button
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    variant="outline"
-                  >
-                    {isExpanded ? "Show Less" : "Learn More"}
-                  </Button>
-                  {isExpanded && (
-                    <p className="mt-2">
-                      Detailed information about {selectedPart.name}...
-                    </p>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <QuizMode
-              labels={labels}
-              onDrop={onDrop}
-              onDragOver={onDragOver}
-              checkAnswer={checkAnswer}
+    <div className="flex flex-col items-center p-4 space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
+      <div className="relative w-full max-w-lg">
+        <svg width="100%" height="300" viewBox="0 0 80 80">
+          {flowerParts.map((part, index) => (
+            <FlowerPart 
+              key={index} 
+              part={part} 
+              onSelect={handlePartSelect}
+              selected={selectedPart === part}
+              onDrop={(e) => handleDrop(e, part)} 
+              onDragOver={handleDragOver}
             />
-          )}
-        </CardContent>
-        <CardFooter>
-          <Button onClick={() => setQuizMode(!quizMode)}>
-            {quizMode ? "View Diagram" : "Quiz Mode"}
-          </Button>
-        </CardFooter>
-      </Card>
+          ))}
+        </svg>
+        {quizMode && <div className="absolute inset-0 bg-white bg-opacity-50 flex justify-center items-center text-lg">Drop labels here!</div>}
+      </div>
+      
+      {!quizMode ? (
+        <FlowerDescription part={selectedPart || { name: "Select a part", description: "Click on any part of the flower to learn more." }} />
+      ) : (
+        <div className="flex flex-col space-y-4">
+          <div className="flex flex-wrap justify-center">
+            {labels.map((label, idx) => (
+              <QuizLabel 
+                key={idx} 
+                label={label} 
+                onDragStart={handleDragStart}
+                isCorrect={label.correct}
+                isPlaced={label.placed}
+              />
+            ))}
+          </div>
+          <Card>
+            <CardContent>
+              <p>Correct: {feedback.correct}/{feedback.total}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      
+      <button 
+        onClick={() => setQuizMode(!quizMode)} 
+        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+      >
+        {quizMode ? 'View Mode' : 'Quiz Mode'}
+      </button>
     </div>
   );
 }

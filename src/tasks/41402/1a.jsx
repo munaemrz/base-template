@@ -1,174 +1,151 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Card } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-const CategoryInput = ({ category, value, onChange, onRemove }) => (
-  <div className="flex items-center space-x-2 mb-2">
-    <Input
-      placeholder="Category"
-      value={category}
-      onChange={(e) => onChange("category", e.target.value)}
-      className="w-1/2"
-    />
-    <Input
-      type="number"
-      placeholder="Value"
-      value={value}
-      onChange={(e) => onChange("value", e.target.value)}
-      className="w-1/3"
-    />
-    <Button onClick={onRemove} variant="destructive" size="sm">
-      Remove
-    </Button>
-  </div>
-);
+const initialData = [
+  { year: 2019, revenue: 1000000, profit: 200000 },
+  { year: 2020, revenue: 1200000, profit: 250000 },
+  { year: 2021, revenue: 1500000, profit: 300000 },
+];
 
-const BarGraph = ({ data }) => {
-  const maxValue = Math.max(...data.map((item) => item.value));
-  const barWidth = 40;
-  const barGap = 20;
-  const width = data.length * (barWidth + barGap);
-  const height = 200;
+function BarGraph({ data }) {
+  const maxValue = Math.max(...data.flatMap((d) => [d.revenue, d.profit]));
+  const [hoveredBar, setHoveredBar] = useState(null);
 
   return (
-    <svg width={width} height={height} className="mt-4">
-      {data.map((item, index) => {
-        const barHeight = (item.value / maxValue) * height;
-        const x = index * (barWidth + barGap);
-        const y = height - barHeight;
-
-        return (
-          <g key={item.category}>
-            <rect
-              x={x}
-              y={y}
-              width={barWidth}
-              height={barHeight}
-              fill="#3b82f6"
-              className="hover:fill-blue-400 transition-colors"
-            >
-              <title>{`${item.category}: ${item.value}`}</title>
-            </rect>
-            <text
-              x={x + barWidth / 2}
-              y={height + 20}
-              textAnchor="middle"
-              className="text-xs"
-            >
-              {item.category}
+    <svg className="w-full h-64" viewBox="0 0 400 200">
+      {data.map((item, index) => (
+        <g key={item.year} transform={`translate(${index * 130 + 50}, 0)`}>
+          <rect
+            x="0"
+            y={200 - (item.revenue / maxValue) * 180}
+            width="50"
+            height={(item.revenue / maxValue) * 180}
+            fill="#3b82f6"
+            onMouseEnter={() => setHoveredBar(`revenue-${item.year}`)}
+            onMouseLeave={() => setHoveredBar(null)}
+          />
+          <rect
+            x="60"
+            y={200 - (item.profit / maxValue) * 180}
+            width="50"
+            height={(item.profit / maxValue) * 180}
+            fill="#10b981"
+            onMouseEnter={() => setHoveredBar(`profit-${item.year}`)}
+            onMouseLeave={() => setHoveredBar(null)}
+          />
+          <text x="30" y="220" textAnchor="middle" fontSize="12">
+            {item.year}
+          </text>
+          {hoveredBar === `revenue-${item.year}` && (
+            <text x="25" y={190 - (item.revenue / maxValue) * 180} textAnchor="middle" fontSize="12">
+              ${item.revenue.toLocaleString()}
             </text>
-          </g>
-        );
-      })}
+          )}
+          {hoveredBar === `profit-${item.year}` && (
+            <text x="85" y={190 - (item.profit / maxValue) * 180} textAnchor="middle" fontSize="12">
+              ${item.profit.toLocaleString()}
+            </text>
+          )}
+        </g>
+      ))}
+      <text x="20" y="20" fontSize="12" fill="#3b82f6">
+        Revenue
+      </text>
+      <text x="20" y="40" fontSize="12" fill="#10b981">
+        Profit
+      </text>
     </svg>
   );
-};
+}
 
-const InsightsPanel = ({ data }) => {
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-  const average = total / data.length;
-  const highest = data.reduce((max, item) => (item.value > max.value ? item : max), data[0]);
-  const lowest = data.reduce((min, item) => (item.value < min.value ? item : min), data[0]);
+function DataInput({ data, setData }) {
+  const handleChange = (index, field, value) => {
+    const newData = [...data];
+    newData[index][field] = parseInt(value) || 0;
+    setData(newData);
+  };
 
   return (
-    <Accordion type="single" collapsible className="w-full">
-      <AccordionItem value="insights">
-        <AccordionTrigger>Insights</AccordionTrigger>
-        <AccordionContent>
-          <ul className="list-disc pl-4">
-            <li>Highest: {highest.category} ({highest.value})</li>
-            <li>Lowest: {lowest.category} ({lowest.value})</li>
-            <li>Total: {total}</li>
-            <li>Average: {average.toFixed(2)}</li>
-          </ul>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+    <div className="space-y-4">
+      {data.map((item, index) => (
+        <div key={item.year} className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+          <Input
+            type="number"
+            value={item.year}
+            onChange={(e) => handleChange(index, "year", e.target.value)}
+            placeholder="Year"
+          />
+          <Input
+            type="number"
+            value={item.revenue}
+            onChange={(e) => handleChange(index, "revenue", e.target.value)}
+            placeholder="Revenue"
+          />
+          <Input
+            type="number"
+            value={item.profit}
+            onChange={(e) => handleChange(index, "profit", e.target.value)}
+            placeholder="Profit"
+          />
+        </div>
+      ))}
+    </div>
   );
-};
+}
+
+function Insights({ data }) {
+  const totalRevenue = data.reduce((sum, item) => sum + item.revenue, 0);
+  const totalProfit = data.reduce((sum, item) => sum + item.profit, 0);
+  const averageRevenue = totalRevenue / data.length;
+  const averageProfit = totalProfit / data.length;
+  const profitMargin = (totalProfit / totalRevenue) * 100;
+
+  return (
+    <div className="space-y-2">
+      <p>Total Revenue: ${totalRevenue.toLocaleString()}</p>
+      <p>Total Profit: ${totalProfit.toLocaleString()}</p>
+      <p>Average Revenue: ${averageRevenue.toLocaleString()}</p>
+      <p>Average Profit: ${averageProfit.toLocaleString()}</p>
+      <p>Overall Profit Margin: {profitMargin.toFixed(2)}%</p>
+    </div>
+  );
+}
 
 export default function App() {
-  const [data, setData] = useState([{ category: "", value: "" }]);
-  const [error, setError] = useState("");
-
-  const addCategory = () => {
-    setData([...data, { category: "", value: "" }]);
-  };
-
-  const updateCategory = (index, field, value) => {
-    const newData = [...data];
-    newData[index][field] = value;
-    setData(newData);
-  };
-
-  const removeCategory = (index) => {
-    const newData = data.filter((_, i) => i !== index);
-    setData(newData);
-  };
+  const [data, setData] = useState(initialData);
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
 
   const resetForm = () => {
-    setData([{ category: "", value: "" }]);
-    setError("");
+    setData(initialData);
   };
-
-  const validateData = () => {
-    const categories = new Set();
-    for (const item of data) {
-      if (!item.category || !item.value) {
-        setError("All fields must be filled");
-        return false;
-      }
-      if (categories.has(item.category)) {
-        setError("Duplicate category names are not allowed");
-        return false;
-      }
-      categories.add(item.category);
-      if (isNaN(item.value) || Number(item.value) < 0) {
-        setError("Values must be positive numbers");
-        return false;
-      }
-    }
-    setError("");
-    return true;
-  };
-
-  useEffect(() => {
-    validateData();
-  }, [data]);
-
-  const validData = data.every((item) => item.category && !isNaN(item.value) && Number(item.value) >= 0);
 
   return (
-    <div className="container mx-auto p-4 max-w-md sm:max-w-xl">
-      <h1 className="text-2xl font-bold mb-4">Data Visualization App</h1>
-      <form className="mb-4">
-        {data.map((item, index) => (
-          <CategoryInput
-            key={index}
-            category={item.category}
-            value={item.value}
-            onChange={(field, value) => updateCategory(index, field, value)}
-            onRemove={() => removeCategory(index)}
-          />
-        ))}
-        <div className="flex space-x-2 mt-2">
-          <Button type="button" onClick={addCategory}>
-            Add Category
+    <div className="container mx-auto p-4 max-w-3xl">
+      <h1 className="text-2xl font-bold mb-4">Revenue and Profit Report</h1>
+      <Card className="p-4 mb-4">
+        <DataInput data={data} setData={setData} />
+        <Button onClick={resetForm} className="mt-4">
+          Reset Form
+        </Button>
+      </Card>
+      <Card className="p-4 mb-4">
+        <BarGraph data={data} />
+      </Card>
+      <Collapsible open={isInsightsOpen} onOpenChange={setIsInsightsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full">
+            {isInsightsOpen ? "Hide Insights" : "Show Insights"}
           </Button>
-          <Button type="button" onClick={resetForm} variant="outline">
-            Reset Form
-          </Button>
-        </div>
-      </form>
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-      {validData && (
-        <div className="overflow-x-auto">
-          <BarGraph data={data.map((item) => ({ ...item, value: Number(item.value) }))} />
-        </div>
-      )}
-      {validData && <InsightsPanel data={data.map((item) => ({ ...item, value: Number(item.value) }))} />}
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-4">
+          <Card className="p-4">
+            <Insights data={data} />
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

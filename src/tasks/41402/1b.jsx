@@ -1,137 +1,114 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 function App() {
-  const [categories, setCategories] = useState([]);
-  const [input, setInput] = useState({ name: '', value: '' });
-  const [error, setError] = useState('');
+  const [data, setData] = useState([
+    { year: '2020', revenue: 100000, profit: 10000 },
+    { year: '2021', revenue: 120000, profit: 15000 },
+    { year: '2022', revenue: 130000, profit: 20000 },
+  ]);
 
-  const addCategory = () => {
-    if (!input.name || !input.value) {
-      setError('Please fill in all fields.');
-      return;
-    }
-    if (!Number.isInteger(Number(input.value)) || Number(input.value) < 0) {
-      setError('Please enter a valid positive number.');
-      return;
-    }
-    if (categories.some(cat => cat.name === input.name)) {
-      setError('Category already exists.');
-      return;
-    }
-    setCategories([...categories, { ...input, value: parseInt(input.value, 10) }]);
-    setInput({ name: '', value: '' });
-    setError('');
+  const handleChange = (index, field, value) => {
+    const newData = [...data];
+    newData[index][field] = Number(value);
+    setData(newData);
   };
 
   const resetForm = () => {
-    setCategories([]);
-    setInput({ name: '', value: '' });
-    setError('');
+    setData([
+      { year: '2020', revenue: 100000, profit: 10000 },
+      { year: '2021', revenue: 120000, profit: 15000 },
+      { year: '2022', revenue: 130000, profit: 20000 },
+    ]);
   };
 
-  const updateCategory = (index, field, value) => {
-    const updated = categories.map((cat, i) => 
-      i === index ? { ...cat, [field]: field === 'value' ? parseInt(value, 10) : value } : cat
-    );
-    setCategories(updated);
-  };
-
-  const maxValue = Math.max(...categories.map(c => c.value), 0);
-  const totalSum = categories.reduce((sum, c) => sum + c.value, 0);
-  const averageValue = totalSum / (categories.length || 1);
+  const maxValue = Math.max(...data.map(d => Math.max(d.revenue, d.profit)));
 
   return (
-    <div className="p-4 space-y-6 bg-gray-100 min-h-screen sm:px-6 lg:px-8">
-      <h1 className="text-2xl font-bold text-center">Custom Bar Graph Generator</h1>
-      <div className="max-w-lg mx-auto bg-white p-6 rounded-lg shadow-md">
-        <div className="space-y-4">
-          <input 
-            value={input.name} 
-            onChange={e => setInput({...input, name: e.target.value})} 
-            placeholder="Category Name" 
-            className="w-full p-2 border border-gray-300 rounded"
-          />
-          <input 
-            type="number" 
-            value={input.value} 
-            onChange={e => setInput({...input, value: e.target.value})} 
-            placeholder="Value" 
-            className="w-full p-2 border border-gray-300 rounded"
-          />
-          {error && <p className="text-red-500">{error}</p>}
-          <button onClick={addCategory} className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Add Category</button>
-          <button onClick={resetForm} className="w-full bg-red-500 text-white p-2 rounded hover:bg-red-600">Reset Form</button>
-        </div>
-        <div className="mt-6">
-          {categories.map((cat, index) => (
-            <div key={index} className="flex items-center mb-2">
+    <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
+      <div className="max-w-3xl mx-auto bg-white p-4 rounded-lg shadow-lg">
+        <h1 className="text-2xl font-bold mb-4">Yearly Revenue & Profit Visualizer</h1>
+        <div className="mb-4">
+          {data.map((entry, index) => (
+            <div key={index} className="mb-2">
+              <label className="block mb-1">Year {entry.year}</label>
               <input 
-                value={cat.name} 
-                onChange={e => updateCategory(index, 'name', e.target.value)} 
-                className="flex-grow p-2 border border-gray-300 rounded mr-2"
+                type="number" 
+                value={entry.revenue} 
+                onChange={(e) => handleChange(index, 'revenue', e.target.value)} 
+                className="w-full p-2 border rounded mb-1" 
+                placeholder="Revenue"
               />
               <input 
                 type="number" 
-                value={cat.value} 
-                onChange={e => updateCategory(index, 'value', e.target.value)} 
-                className="w-20 p-2 border border-gray-300 rounded"
+                value={entry.profit} 
+                onChange={(e) => handleChange(index, 'profit', e.target.value)} 
+                className="w-full p-2 border rounded" 
+                placeholder="Profit"
               />
             </div>
           ))}
+          <button onClick={resetForm} className="mt-2 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Reset Form</button>
         </div>
-      </div>
-
-      <div className="mt-8 max-w-lg mx-auto">
-        <Graph categories={categories} maxValue={maxValue} />
-        <InsightsPanel categories={categories} totalSum={totalSum} averageValue={averageValue} />
+        <BarGraph data={data} maxValue={maxValue} />
+        <Insights data={data} />
       </div>
     </div>
   );
 }
 
-function Graph({ categories, maxValue }) {
+function BarGraph({ data, maxValue }) {
+  const barWidth = 40;
+  const barMargin = 10;
+
   return (
-    <svg width="100%" height="300" className="mt-4">
-      {categories.map((cat, index) => {
-        const barHeight = (cat.value / maxValue) * 250;
-        return (
-          <g key={index} transform={`translate(${index * 60}, 0)`}>
+    <div className="mt-6">
+      <svg width="100%" height="300" className="bg-gray-50 rounded">
+        {data.map((d, i) => (
+          <>
             <rect 
-              y={300 - barHeight} 
-              width="40" 
-              height={barHeight} 
-              fill="steelblue" 
-              className="hover:fill-blue-700 cursor-pointer"
-              onMouseOver={e => e.currentTarget.setAttribute('fill', 'blue-700')}
-              onMouseOut={e => e.currentTarget.setAttribute('fill', 'steelblue')}
+              key={`revenue-${i}`}
+              x={i * (barWidth + barMargin)} 
+              y={300 - (d.revenue / maxValue * 250)} 
+              width={barWidth} 
+              height={d.revenue / maxValue * 250} 
+              fill="#3498db"
+              className="hover:fill-blue-600 transition-colors"
             >
-              <title>{`${cat.name}: ${cat.value}`}</title>
+              <title>Revenue: ${d.revenue.toLocaleString()}</title>
             </rect>
-            <text x="20" y="315" textAnchor="middle" fontSize="10">{cat.name}</text>
-          </g>
-        );
-      })}
-    </svg>
+            <rect 
+              key={`profit-${i}`}
+              x={i * (barWidth + barMargin)} 
+              y={300 - (d.profit / maxValue * 250)} 
+              width={barWidth} 
+              height={d.profit / maxValue * 250} 
+              fill="#2ecc71"
+              className="hover:fill-green-600 transition-colors"
+            >
+              <title>Profit: ${d.profit.toLocaleString()}</title>
+            </rect>
+            <text x={i * (barWidth + barMargin) + barWidth / 2} y="295" textAnchor="middle">{d.year}</text>
+          </>
+        ))}
+      </svg>
+    </div>
   );
 }
 
-function InsightsPanel({ categories, totalSum, averageValue }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const highest = categories.reduce((prev, current) => (prev.value > current.value) ? prev : current, {name: '', value: 0});
-  const lowest = categories.reduce((prev, current) => (prev.value < current.value) ? prev : current, {name: '', value: Infinity});
+function Insights({ data }) {
+  const totalRevenue = data.reduce((sum, d) => sum + d.revenue, 0);
+  const totalProfit = data.reduce((sum, d) => sum + d.profit, 0);
+  const profitMargin = ((totalProfit / totalRevenue) * 100).toFixed(2);
 
   return (
-    <div className="mt-4 bg-white p-4 rounded-lg shadow">
-      <button onClick={() => setIsOpen(!isOpen)} className="w-full text-left font-bold">Insights {isOpen ? '▲' : '▼'}</button>
-      {isOpen && (
-        <div className="mt-2 space-y-2">
-          <p>Highest Value: {highest.name} ({highest.value})</p>
-          <p>Lowest Value: {lowest.name} ({lowest.value})</p>
-          <p>Total Sum: {totalSum}</p>
-          <p>Average Value: {averageValue.toFixed(2)}</p>
-        </div>
-      )}
-    </div>
+    <details className="mt-4">
+      <summary className="cursor-pointer text-lg font-semibold">Key Insights</summary>
+      <div className="mt-2">
+        <p>Total Revenue: ${totalRevenue.toLocaleString()}</p>
+        <p>Total Profit: ${totalProfit.toLocaleString()}</p>
+        <p>Average Profit Margin: {profitMargin}%</p>
+      </div>
+    </details>
   );
 }
 

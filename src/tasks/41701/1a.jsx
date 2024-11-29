@@ -1,73 +1,85 @@
-import React, { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
+import React, { useState, useEffect } from 'react';
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/shadcn-ui";
 
-function Clock({ format24 }) {
-  const [currentTime, setCurrentTime] = useState(new Date());
+const timeZones = [
+  { label: 'UTC', value: 'UTC' },
+  { label: 'New York', value: 'America/New_York' },
+  { label: 'London', value: 'Europe/London' },
+  { label: 'Tokyo', value: 'Asia/Tokyo' },
+];
+
+function formatTime(date, format24) {
+  const hours = format24 ? date.getHours() : (date.getHours() % 12 || 12);
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const seconds = date.getSeconds().toString().padStart(2, '0');
+  const ampm = format24 ? '' : (date.getHours() >= 12 ? 'PM' : 'AM');
+  return `${hours}:${minutes}:${seconds}${ampm}`;
+}
+
+function getTimeDifference(localDate, selectedZone) {
+  const localOffset = localDate.getTimezoneOffset() * 60000;
+  const selectedOffset = new Date(localDate.toLocaleString("en-US", {timeZone: selectedZone})).getTime() - localDate.getTime();
+  const difference = (selectedOffset - localOffset) / 3600000;
+  return {
+    hours: Math.floor(Math.abs(difference)),
+    sign: difference > 0 ? '+' : '-'
+  };
+}
+
+function Clock({ timezone, format24 }) {
+  const [time, setTime] = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date());
+      setTime(new Date());
     }, 1000);
-
     return () => clearInterval(timer);
   }, []);
 
-  const formatTime = (date) => {
-    let hours = date.getHours();
-    let minutes = date.getMinutes();
-    let seconds = date.getSeconds();
-    let ampm = "";
-
-    if (!format24) {
-      ampm = hours >= 12 ? "PM" : "AM";
-      hours = hours % 12;
-      hours = hours ? hours : 12; // the hour '0' should be '12'
-    }
-
-    minutes = minutes < 10 ? "0" + minutes : minutes;
-    seconds = seconds < 10 ? "0" + seconds : seconds;
-
-    return `${format24 ? hours : hours}:${minutes}:${seconds}${ampm}`;
-  };
-
-  return (
-    <div className="text-center">
-      <h1 className="text-4xl sm:text-5xl font-bold text-gray-800 mb-4">
-        {formatTime(currentTime)}
-      </h1>
-      <p className="text-sm sm:text-base text-gray-500">
-        {currentTime.toDateString()}
-      </p>
-    </div>
-  );
+  return <div>{formatTime(new Date(time), format24)}</div>;
 }
 
 export default function App() {
-  const [is24Hour, setIs24Hour] = useState(true);
+  const [format24, setFormat24] = useState(false);
+  const [selectedZone, setSelectedZone] = useState('UTC');
+
+  const localDate = new Date();
+  const { hours: diffHours, sign } = getTimeDifference(localDate, selectedZone);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-      <div className="max-w-sm w-full bg-white shadow-lg rounded-lg p-6 space-y-4">
-        <Clock format24={is24Hour} />
-        <div className="flex justify-center">
-          <Switch
-            checked={is24Hour}
-            onCheckedChange={() => setIs24Hour(!is24Hour)}
-            className="mr-2"
-          />
-          <label className="text-sm sm:text-base">
-            {is24Hour ? "24-Hour Format" : "12-Hour Format"}
-          </label>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4 sm:p-8">
+      <div className="max-w-md w-full bg-white shadow-lg rounded-lg overflow-hidden">
+        <div className="p-4 text-center">
+          <h1 className="text-2xl font-bold mb-4">World Clock</h1>
+          <Clock timezone={selectedZone} format24={format24} />
+          <div className="mt-2 text-sm text-gray-500">
+            Local Time: <Clock timezone={Intl.DateTimeFormat().resolvedOptions().timeZone} format24={format24} />
+          </div>
+          <div className="mt-2">
+            <Button onClick={() => setFormat24(!format24)}>
+              Switch to {format24 ? '12-hour' : '24-hour'} format
+            </Button>
+          </div>
+          <div className="mt-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">{selectedZone}</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuLabel>Select Timezone</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {timeZones.map(zone => (
+                  <DropdownMenuItem key={zone.value} onClick={() => setSelectedZone(zone.value)}>
+                    {zone.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <div className="mt-4 text-sm">
+            Time difference: {sign}{diffHours} hours
+          </div>
         </div>
-        <Button
-          onClick={() => setIs24Hour(!is24Hour)}
-          variant="outline"
-          size="sm"
-          className="w-full mt-4"
-        >
-          Toggle Time Format
-        </Button>
       </div>
     </div>
   );

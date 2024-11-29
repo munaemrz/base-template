@@ -1,124 +1,116 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import React, { useState, useEffect } from 'react';
+import { Button, Input, Card, CardHeader, CardBody, CardFooter } from "@shadcn/ui";
 import * as math from 'mathjs';
 
-const Graph = ({ expression, range }) => {
-  const [points, setPoints] = useState([]);
+function App() {
+  const [functionInput, setFunctionInput] = useState('x^2');
+  const [error, setError] = useState(null);
+  const [graphData, setGraphData] = useState([]);
+  const [range, setRange] = useState({ min: -10, max: 10 });
 
   useEffect(() => {
-    const calculatePoints = () => {
-      const xValues = Array.from({length: 200}, (_, i) => range.min + (i * (range.max - range.min) / 200));
-      const yValues = xValues.map(x => {
-        try {
-          return math.evaluate(expression, {x});
-        } catch (e) {
-          return NaN;
-        }
-      });
-      setPoints(xValues.map((x, i) => [x, yValues[i]]));
-    };
-    calculatePoints();
-  }, [expression, range]);
-
-  return (
-    <div className="w-full h-64 sm:h-96">
-      <svg viewBox={`${range.min} -10 ${Math.abs(range.max - range.min)} 20`} className="w-full h-full">
-        <path d={`M${points.map(p => `${p[0]} ${-p[1]}`).join(' L')}`} fill="none" stroke="blue" strokeWidth="2" />
-      </svg>
-    </div>
-  );
-};
-
-const FunctionInfo = ({ expression }) => {
-  let info = { type: 'Unknown', degree: 'N/A', domain: 'All real numbers', range: 'N/A' };
-  
-  try {
-    const node = math.parse(expression);
-    info.type = node.type;
-    if (node.type === 'FunctionNode') {
-      const fn = node.fn.name;
-      if (fn === 'sin' || fn === 'cos') info.range = '[-1, 1]';
-    } else if (node.type === 'PolynomialTerm') {
-      info.degree = node.degree;
-    }
-  } catch (e) {}
-
-  return (
-    <div className="mt-4">
-      <p><strong>Type:</strong> {info.type}</p>
-      <p><strong>Degree:</strong> {info.degree}</p>
-      <p><strong>Domain:</strong> {info.domain}</p>
-      <p><strong>Range:</strong> {info.range}</p>
-    </div>
-  );
-};
-
-const educationApp = () => {
-  const [functionInput, setFunctionInput] = useState('x^2');
-  const [error, setError] = useState('');
-  const [range, setRange] = useState({ min: -10, max: 10 });
-  const examples = ['x', 'x^2', 'sin(x)', 'log(x)', 'e^x'];
-
-  const validateFunction = useCallback(() => {
-    try {
-      math.evaluate(functionInput, {x: 0});
-      setError('');
-    } catch (e) {
-      setError('Invalid function. Please check your input.');
+    if (functionInput) {
+      plotFunction(functionInput);
     }
   }, [functionInput]);
 
-  useEffect(() => {
-    validateFunction();
-  }, [validateFunction]);
-
-  const handleExampleSelect = (example) => {
-    setFunctionInput(example);
+  const validateAndPlot = (funcStr) => {
+    try {
+      math.parse(funcStr);
+      setError(null);
+      setFunctionInput(funcStr);
+    } catch (e) {
+      setError("Invalid function. Please check your input.");
+    }
   };
 
+  const plotFunction = (funcStr) => {
+    const functionNode = math.parse(funcStr);
+    const compiledFunc = functionNode.compile();
+    let data = [];
+    for (let x = range.min; x <= range.max; x += 0.1) {
+      let y;
+      try {
+        y = compiledFunc.evaluate({ x: x });
+        if (!isFinite(y)) y = null; // Handle infinity or NaN
+      } catch (e) {
+        y = null; // Handle errors in function evaluation
+      }
+      data.push({ x, y });
+    }
+    setGraphData(data);
+  };
+
+  const reset = () => {
+    setFunctionInput('x^2');
+    setRange({ min: -10, max: 10 });
+    setError(null);
+  };
+
+  const presets = [
+    'x^2',
+    'sin(x)',
+    'log(x)',
+    'e^x',
+  ];
+
   return (
-    <div className="p-4 sm:p-8 max-w-lg mx-auto">
-      <Card>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4 sm:p-8">
+      <Card className="w-full max-w-lg">
         <CardHeader>
-          <CardTitle>Function Visualizer</CardTitle>
-          <CardDescription>Enter a function to see its graph.</CardDescription>
+          <h2 className="text-lg font-semibold">Function Visualizer</h2>
         </CardHeader>
-        <CardContent>
-          <Label htmlFor="function">Function</Label>
-          <Input 
-            id="function" 
-            value={functionInput} 
-            onChange={(e) => setFunctionInput(e.target.value)} 
-            className="mb-2"
-            onBlur={validateFunction}
+        <CardBody>
+          <Input
+            value={functionInput}
+            onChange={(e) => validateAndPlot(e.target.value)}
+            placeholder="Enter a function of x"
+            className="mb-4"
           />
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-          
-          <div className="mt-4">
-            {examples.map(example => (
-              <Button 
-                key={example} 
-                variant="outline" 
-                className="mr-2 mb-2" 
-                onClick={() => handleExampleSelect(example)}
-              >
-                {example}
+          {error && <p className="text-red-500 mb-4">{error}</p>}
+          <div className="mb-4">
+            <label>Range: from 
+              <Input 
+                type="number" 
+                value={range.min} 
+                onChange={(e) => setRange({...range, min: Number(e.target.value)})} 
+                className="w-20 ml-2 mr-2"
+              /> 
+              to 
+              <Input 
+                type="number" 
+                value={range.max} 
+                onChange={(e) => setRange({...range, max: Number(e.target.value)})} 
+                className="w-20 ml-2"
+              />
+            </label>
+          </div>
+          <div className="graph-container h-64 border border-gray-300 p-2">
+            {graphData.length > 0 && (
+              <svg width="100%" height="100%" viewBox={`${range.min} -10 ${range.max - range.min} 20`}>
+                <path d={graphData.map((point, i) => 
+                  `${i === 0 ? 'M' : 'L'} ${point.x} ${-point.y || 0}`
+                ).join(' ')} stroke="blue" fill="none" strokeWidth="0.1"/>
+              </svg>
+            )}
+          </div>
+        </CardBody>
+        <CardFooter>
+          <div className="flex flex-wrap gap-2">
+            {presets.map(preset => (
+              <Button key={preset} onClick={() => validateAndPlot(preset)}>
+                {preset}
               </Button>
             ))}
+            <Button onClick={reset}>Reset</Button>
           </div>
-          
-          <Graph expression={functionInput} range={range} />
-          <FunctionInfo expression={functionInput} />
-        </CardContent>
-        <CardFooter>
-          <Button onClick={() => { setFunctionInput(''); setError(''); }}>Reset</Button>
         </CardFooter>
       </Card>
+      <div className="mt-4 text-sm text-gray-500">
+        Note: Use 'x' as the variable. Functions like 'log' for natural logarithm, 'e' for Euler's number are supported.
+      </div>
     </div>
   );
 }
 
-export default educationApp;
+export default App;

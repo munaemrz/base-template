@@ -1,148 +1,126 @@
-import React, { useState, useEffect } from "react";
-import {
-  Card,
-  CardHeader,
-  CardFooter,
-  CardContent,
-} from "@/components/ui/card";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 
-const words = [
-  "REACT",
-  "TAILWIND",
-  "JAVASCRIPT",
-  "HANGMAN",
-  "DEVELOPER",
-  "PROGRAMMING",
-];
-const MAX_ATTEMPTS = 6;
+const words = ["react", "javascript", "hangman", "tailwind", "component"];
 
 const HangmanDrawing = ({ incorrectGuesses }) => {
-  const parts = [
-    "head",
-    "body",
-    "left-arm",
-    "right-arm",
-    "left-leg",
-    "right-leg",
-  ];
   return (
-    <div className="flex justify-center items-center">
-      <svg height="150" width="100" className="border-2 border-gray-300">
-        <line x1="10" y1="140" x2="90" y2="140" />
-        <line x1="30" y1="140" x2="30" y2="10" />
-        <line x1="30" y1="10" x2="50" y2="10" />
-        <line x1="50" y1="10" x2="50" y2="20" />
-        {parts.slice(0, incorrectGuesses).map((_, index) => (
-          <circle
-            key={index}
-            cx="50"
-            cy="30"
-            r="20"
-            className={`hangman-part ${_}`}
-          />
-        ))}
-      </svg>
+    <svg viewBox="0 0 100 100" className="w-32 h-32 mx-auto">
+      {/* Base */}
+      <line x1="10" y1="90" x2="90" y2="90" stroke="black" strokeWidth="2" />
+      {/* Pole */}
+      <line x1="30" y1="90" x2="30" y2="10" stroke="black" strokeWidth="2" />
+      <line x1="30" y1="10" x2="70" y2="10" stroke="black" strokeWidth="2" />
+      <line x1="70" y1="10" x2="70" y2="20" stroke="black" strokeWidth="2" />
+      {/* Parts of the hangman */}
+      {incorrectGuesses > 0 && <circle cx="70" cy="30" r="5" stroke="black" fill="none" strokeWidth="2" />}
+      {incorrectGuesses > 1 && <line x1="70" y1="35" x2="70" y2="50" stroke="black" strokeWidth="2" />}
+      {incorrectGuesses > 2 && <line x1="70" y1="40" x2="65" y2="45" stroke="black" strokeWidth="2" />}
+      {incorrectGuesses > 3 && <line x1="70" y1="40" x2="75" y2="45" stroke="black" strokeWidth="2" />}
+      {incorrectGuesses > 4 && <line x1="70" y1="50" x2="65" y2="55" stroke="black" strokeWidth="2" />}
+      {incorrectGuesses > 5 && <line x1="70" y1="50" x2="75" y2="55" stroke="black" strokeWidth="2" />}
+    </svg>
+  );
+};
+
+const WordDisplay = ({ word, guessedLetters }) => {
+  return (
+    <div className="text-2xl font-bold text-center mt-4">
+      {word.split("").map((letter, index) =>
+        guessedLetters.includes(letter) ? (
+          <span key={index} className="mx-1">
+            {letter}
+          </span>
+        ) : (
+          <span key={index} className="mx-1">
+            _
+          </span>
+        )
+      )}
     </div>
   );
 };
 
-const Hangman = () => {
-  const [word, setWord] = useState("");
+export default function App() {
+  const [word, setWord] = useState(words[Math.floor(Math.random() * words.length)]);
   const [guessedLetters, setGuessedLetters] = useState([]);
-  const [remainingAttempts, setRemainingAttempts] = useState(MAX_ATTEMPTS);
-  const [gameStatus, setGameStatus] = useState("playing");
-
-  useEffect(() => {
-    startNewGame();
-  }, []);
-
-  const startNewGame = () => {
-    const randomWord = words[Math.floor(Math.random() * words.length)];
-    setWord(randomWord);
-    setGuessedLetters([]);
-    setRemainingAttempts(MAX_ATTEMPTS);
-    setGameStatus("playing");
-  };
+  const [incorrectGuesses, setIncorrectGuesses] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+  const [gameWon, setGameWon] = useState(false);
 
   const handleGuess = (letter) => {
-    if (gameStatus !== "playing" || guessedLetters.includes(letter)) return;
+    if (gameOver || guessedLetters.includes(letter)) return;
 
-    const newGuessedLetters = [...guessedLetters, letter];
-    setGuessedLetters(newGuessedLetters);
+    setGuessedLetters((prev) => [...prev, letter]);
 
-    if (!word.includes(letter)) {
-      setRemainingAttempts((prev) => prev - 1);
-      if (remainingAttempts - 1 === 0) {
-        setGameStatus("lost");
+    if (word.includes(letter)) {
+      const allGuessed = word.split("").every((l) => guessedLetters.includes(l) || l === letter);
+      if (allGuessed) {
+        setGameWon(true);
+        setGameOver(true);
       }
-    } else if (
-      word.split("").every((char) => newGuessedLetters.includes(char))
-    ) {
-      setGameStatus("won");
+    } else {
+      setIncorrectGuesses((prev) => {
+        const newCount = prev + 1;
+        if (newCount >= 6) {
+          setGameOver(true);
+        }
+        return newCount;
+      });
     }
   };
 
-  const renderWord = () => {
-    return word.split("").map((letter, index) => (
-      <span key={index} className="text-4xl font-bold mx-1">
-        {guessedLetters.includes(letter) ? letter : "_"}
-      </span>
-    ));
-  };
-
-  const renderKeyboard = () => {
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-    return alphabet.map((letter) => (
-      <Button
-        key={letter}
-        onClick={() => handleGuess(letter)}
-        disabled={guessedLetters.includes(letter) || gameStatus !== "playing"}
-        className="m-1"
-      >
-        {letter}
-      </Button>
-    ));
+  const resetGame = () => {
+    setWord(words[Math.floor(Math.random() * words.length)]);
+    setGuessedLetters([]);
+    setIncorrectGuesses(0);
+    setGameOver(false);
+    setGameWon(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="container mx-auto p-4">
+      <h1 className="text-xl font-bold text-center mb-4">Hangman Game</h1>
+      <Card className="mb-4">
         <CardHeader>
-          <h1 className="text-center text-2xl font-bold">Hangman Game</h1>
+          <CardTitle>Game Board</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex justify-center mb-4">
-            <HangmanDrawing
-              incorrectGuesses={MAX_ATTEMPTS - remainingAttempts}
-            />
-          </div>
-          <div className="text-center mb-4">{renderWord()}</div>
-          <div className="text-center mb-4">
-            Remaining attempts: {remainingAttempts}
-          </div>
-          <div className="flex flex-wrap justify-center mb-4">
-            {renderKeyboard()}
-          </div>
-          <div className="text-center">
-            {gameStatus === "won" && (
-              <p className="text-green-600 font-bold">You Won!</p>
-            )}
-            {gameStatus === "lost" && (
-              <p className="text-red-600 font-bold">
-                Game Over! The word was: {word}
-              </p>
-            )}
+          <HangmanDrawing incorrectGuesses={incorrectGuesses} />
+          <WordDisplay word={word} guessedLetters={guessedLetters} />
+        </CardContent>
+      </Card>
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Guess a Letter</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-7 gap-2">
+            {"abcdefghijklmnopqrstuvwxyz".split("").map((letter) => (
+              <Button
+                key={letter}
+                onClick={() => handleGuess(letter)}
+                variant={guessedLetters.includes(letter) ? "secondary" : "default"}
+                disabled={guessedLetters.includes(letter) || gameOver}
+                className="uppercase"
+              >
+                {letter}
+              </Button>
+            ))}
           </div>
         </CardContent>
-        <CardFooter>
-          <Button onClick={startNewGame} className="w-full">
-            Restart Game
-          </Button>
-        </CardFooter>
       </Card>
+      <div className="text-center">
+        {gameOver && (
+          <p className={`text-lg font-bold mb-4 ${gameWon ? "text-green-500" : "text-red-500"}`}>
+            {gameWon ? "You Won!" : `You Lost! The word was "${word}".`}
+          </p>
+        )}
+        <Button onClick={resetGame} className="bg-blue-500 text-white">
+          Restart Game
+        </Button>
+      </div>
     </div>
   );
-};
-
-export default Hangman;
+}

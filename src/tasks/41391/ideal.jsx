@@ -47,16 +47,17 @@ function GameGrid({ grid, revealed, handleCellClick }) {
     </div>
   );
 }
-
 export default function App() {
   const [gridSize, setGridSize] = useState({ rows: 4, cols: 4 });
   const [difficulty, setDifficulty] = useState("easy");
   const [grid, setGrid] = useState([]);
   const [revealed, setRevealed] = useState([]);
   const [selected, setSelected] = useState([]);
-  const [score, setScore] = useState(0);
+  const [playerScores, setPlayerScores] = useState({ human: 0, computer: 0 });
   const [timeLeft, setTimeLeft] = useState(0);
   const [gameState, setGameState] = useState("setup");
+  const [currentPlayer, setCurrentPlayer] = useState("human");
+  const [username, setUsername] = useState("");
 
   useEffect(() => {
     if (gameState === "playing") {
@@ -68,6 +69,14 @@ export default function App() {
       } else {
         setGameState("lost");
       }
+    }
+    else if(gameState === "setup"){
+      setUsername("");
+      setSelected([]);
+      setPlayerScores({ human: 0, computer: 0 });
+      setTimeLeft(difficulties[difficulty].timeLimit);
+      setGridSize({ rows: 4, cols: 4 });
+      setDifficulty("easy");
     }
   }, [gameState, timeLeft]);
 
@@ -94,13 +103,32 @@ export default function App() {
       )
     );
     setSelected([]);
-    setScore(0);
-    setTimeLeft(difficulties[difficulty].timeLimit); // Properly set the timer based on difficulty
+    setPlayerScores({ human: 0, computer: 0 });
+    setTimeLeft(difficulties[difficulty].timeLimit);
     setGameState("playing");
+    setCurrentPlayer("human");
+  };
+
+  const resetGame = () => {
+    // Resets timer, score, and hides all cards
+    setRevealed(
+      Array.from({ length: gridSize.rows }, () =>
+        Array(gridSize.cols).fill(false)
+      )
+    );
+    setSelected([]);
+    setPlayerScores({ human: 0, computer: 0 });
+    setTimeLeft(difficulties[difficulty].timeLimit);
+    setCurrentPlayer("human");
   };
 
   const handleCellClick = (row, col) => {
-    if (gameState !== "playing" || revealed[row][col]) return;
+    if (
+      gameState !== "playing" ||
+      revealed[row][col] ||
+      currentPlayer !== "human"
+    )
+      return;
 
     const updatedRevealed = [...revealed];
     updatedRevealed[row][col] = true;
@@ -112,7 +140,10 @@ export default function App() {
     if (updatedSelected.length === 2) {
       const [first, second] = updatedSelected;
       if (grid[first.row][first.col] === grid[second.row][second.col]) {
-        setScore((prev) => prev + 10);
+        setPlayerScores((prev) => ({
+          ...prev,
+          human: prev.human + 10,
+        }));
         if (updatedRevealed.flat().every((cell) => cell)) {
           setGameState("won");
         }
@@ -121,23 +152,75 @@ export default function App() {
           updatedRevealed[first.row][first.col] = false;
           updatedRevealed[second.row][second.col] = false;
           setRevealed(updatedRevealed);
-          setScore((prev) => Math.max(0, prev - 5));
         }, 1000);
       }
       setSelected([]);
+      setCurrentPlayer("computer");
     }
   };
 
+  const computerMove = () => {
+    if (gameState !== "playing" || currentPlayer !== "computer") return;
+
+    const unrevealedCells = [];
+    revealed.forEach((row, rowIndex) =>
+      row.forEach((cell, colIndex) => {
+        if (!cell) unrevealedCells.push({ row: rowIndex, col: colIndex });
+      })
+    );
+
+    if (unrevealedCells.length > 0) {
+      const [first, second] = unrevealedCells.sort(() => Math.random() - 0.5);
+      const updatedRevealed = [...revealed];
+      updatedRevealed[first.row][first.col] = true;
+      updatedRevealed[second.row][second.col] = true;
+      setRevealed(updatedRevealed);
+
+      if (grid[first.row][first.col] === grid[second.row][second.col]) {
+        setPlayerScores((prev) => ({
+          ...prev,
+          computer: prev.computer + 10,
+        }));
+      } else {
+        setTimeout(() => {
+          updatedRevealed[first.row][first.col] = false;
+          updatedRevealed[second.row][second.col] = false;
+          setRevealed(updatedRevealed);
+        }, 1000);
+      }
+      setCurrentPlayer("human");
+    }
+  };
+
+  useEffect(() => {
+    if (currentPlayer === "computer") {
+      setTimeout(computerMove, 1000);
+    }
+  }, [currentPlayer]);
+
   return (
     <div className="container mx-auto p-4 max-w-md">
-      <h1 className="text-2xl font-bold mb-4">Puzzle Grid Game</h1>
       {gameState === "setup" && (
         <div className="space-y-4">
           <Input
+            placeholder="Enter your name"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <Input
             type="number"
+            placeholder="Rows"
             value={gridSize.rows}
             onChange={(e) =>
               setGridSize((prev) => ({ ...prev, rows: +e.target.value }))
+            }
+          />
+          <Input
+            type="number"
+            placeholder="Columns"
+            value={gridSize.cols}
+            onChange={(e) =>
+              setGridSize((prev) => ({ ...prev, cols: +e.target.value }))
             }
           />
           <Select onValueChange={setDifficulty} defaultValue={difficulty}>
@@ -150,7 +233,12 @@ export default function App() {
               <SelectItem value="hard">Hard</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={startGame}>Start Game</Button>
+          <Button
+            onClick={startGame}
+            disabled={!username.trim()} // Disable button until username is provided
+          >
+            Start Game
+          </Button>
         </div>
       )}
       {gameState === "playing" && (
@@ -160,14 +248,21 @@ export default function App() {
             revealed={revealed}
             handleCellClick={handleCellClick}
           />
-          <div>Score: {score}</div>
+          <div className="flex justify-between mt-4">
+            <div>{username}: {playerScores.human}</div>
+            <div>Computer: {playerScores.computer}</div>
+          </div>
           <div>Time Left: {timeLeft}s</div>
+          <div className="flex space-x-4 mt-4">
+            <Button onClick={resetGame}>Reset</Button>
+            <Button onClick={() => setGameState("setup")}>Restart</Button>
+          </div>
         </div>
       )}
       {gameState === "won" && (
         <div>
           <div className="text-green-600 font-bold text-center mb-4">
-            You won!
+            {username} won!
           </div>
           <Button onClick={() => setGameState("setup")}>Play Again</Button>
         </div>

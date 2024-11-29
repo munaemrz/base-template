@@ -1,124 +1,75 @@
-import React, { useState, useEffect } from "react";
-import {
-  Card,
-  CardHeader,
-  CardFooter,
-  CardContent,
-} from "@/components/ui/card";
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 
-const words = [
-  "JAVASCRIPT",
-  "HANGMAN",
-  "DEVELOPER",
-  "REACT",
-  "TAILWIND",
-  "SHADCN",
-];
-
-const HangmanFigure = ({ wrongGuesses }) => {
-  const parts = [
-    "head",
-    "body",
-    "left-arm",
-    "right-arm",
-    "left-leg",
-    "right-leg",
-  ];
-  return (
-    <div className="hangman-figure">
-      {parts.slice(0, wrongGuesses).map((part, index) => (
-        <div key={index} className={`part ${part}`}></div>
-      ))}
-    </div>
-  );
-};
+const words = ['JAVASCRIPT', 'REACT', 'TAILWIND', 'SHADCN', 'HANGMAN'];
 
 const Hangman = () => {
-  const [word, setWord] = useState("");
-  const [guessed, setGuessed] = useState(new Set());
+  const [word, setWord] = useState('');
+  const [guessedLetters, setGuessedLetters] = useState([]);
   const [wrongGuesses, setWrongGuesses] = useState(0);
   const maxWrong = 6;
+  const parts = ['head', 'body', 'rightArm', 'leftArm', 'rightLeg', 'leftLeg'];
 
   useEffect(() => {
-    resetGame();
+    const randomWord = words[Math.floor(Math.random() * words.length)];
+    setWord(randomWord);
   }, []);
 
-  const resetGame = () => {
-    setWord(words[Math.floor(Math.random() * words.length)]);
-    setGuessed(new Set());
-    setWrongGuesses(0);
-  };
-
-  const guessedWord = () => {
-    return word.split("").map((letter) => (guessed.has(letter) ? letter : "_"));
-  };
-
-  const handleGuess = (e) => {
-    let letter = e.target.value;
-    setGuessed((prev) => new Set(prev).add(letter));
-    if (!word.includes(letter)) {
-      setWrongGuesses(wrongGuesses + 1);
+  const handleGuess = (letter) => {
+    if (!guessedLetters.includes(letter)) {
+      setGuessedLetters([...guessedLetters, letter]);
+      if (!word.includes(letter)) {
+        setWrongGuesses(wrongGuesses + 1);
+      }
     }
   };
 
-  const gameStatus = () => {
-    if (guessedWord().join("") === word) return "You Win!";
-    if (wrongGuesses >= maxWrong) return "Game Over!";
-    return `Guesses left: ${maxWrong - wrongGuesses}`;
-  };
+  const displayWord = word
+    .split('')
+    .map(letter => (guessedLetters.includes(letter) ? letter : '_'))
+    .join(' ');
 
-  const generateButtons = () => {
-    return "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((letter) => (
-      <Button
-        key={letter}
-        value={letter}
-        onClick={handleGuess}
-        disabled={guessed.has(letter)}
-        variant={guessed.has(letter) ? "secondary" : "default"}
-      >
-        {letter}
-      </Button>
-    ));
+  const gameWon = word.split('').every(letter => guessedLetters.includes(letter));
+  const gameLost = wrongGuesses >= maxWrong;
+
+  const resetGame = () => {
+    setWord(words[Math.floor(Math.random() * words.length)]);
+    setGuessedLetters([]);
+    setWrongGuesses(0);
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <Card className="w-full max-w-sm p-4 sm:p-6">
-        <CardHeader>
-          <h1 className="text-2xl font-bold text-center">Hangman Game</h1>
-        </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <HangmanFigure wrongGuesses={wrongGuesses} />
-          <p className="text-lg">{gameStatus()}</p>
-          <div className="word">
-            {guessedWord().map((letter, index) => (
-              <span key={index} className="text-2xl mx-1">
-                {letter}
-              </span>
-            ))}
-          </div>
-          <div className="guess-buttons grid grid-cols-7 gap-2 mt-4">
-            {generateButtons()}
-          </div>
-        </CardContent>
-        <CardFooter className="pt-0">
-          <Button onClick={resetGame} className="w-full">
-            Restart Game
-          </Button>
-        </CardFooter>
-      </Card>
-      {(gameStatus() === "You Win!" || gameStatus() === "Game Over!") && (
-        <p
-          className={`mt-4 text-xl ${
-            gameStatus() === "You Win!" ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          The word was: {word}
-        </p>
-      )}
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-100 sm:px-4">
+      <h1 className="text-4xl font-bold mb-4">Hangman</h1>
+      <div className="mb-4">
+        {parts.map((part, index) => (
+          <div key={part} className={`${index < wrongGuesses ? 'block' : 'hidden'} w-8 h-8 bg-red-500 m-1 inline-block`} />
+        ))}
+      </div>
+      <div className="text-3xl mb-4">
+        {displayWord}
+      </div>
+      <div>
+        {gameWon && <p className="text-green-500 text-xl">You Win! The word was {word}</p>}
+        {gameLost && <p className="text-red-500 text-xl">You Lose! The word was {word}</p>}
+      </div>
+      <div className="mb-4">
+        {Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)).map(letter => (
+          <button 
+            key={letter} 
+            onClick={() => handleGuess(letter)} 
+            className={`m-1 p-2 ${guessedLetters.includes(letter) ? 'bg-gray-300' : 'bg-blue-500 hover:bg-blue-700 text-white'} rounded`}
+            disabled={guessedLetters.includes(letter) || gameWon || gameLost}
+          >
+            {letter}
+          </button>
+        ))}
+      </div>
+      <Button onClick={resetGame} className="mt-4">Restart Game</Button>
     </div>
   );
 };
 
-export default Hangman;
+export default function App() {
+  return <Hangman />;
+}
