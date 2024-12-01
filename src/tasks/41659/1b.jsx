@@ -1,148 +1,151 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-
-const API_KEY = "YOUR_OPENWEATHERMAP_API_KEY";
-
-const WeatherCard = ({ weather }) => {
-  return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>{weather.name}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col items-center">
-          <p className="text-4xl font-bold">{Math.round(weather.main.temp)}°C</p>
-          <p className="text-xl capitalize">{weather.weather[0].description}</p>
-          <p className="text-lg">Humidity: {weather.main.humidity}%</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-const HistoryPanel = ({ history, onHistoryItemClick }) => {
-  return (
-    <Card className="w-full max-w-md mt-4">
-      <CardHeader>
-        <CardTitle>Search History</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[200px]">
-          {history.map((city, index) => (
-            <Button
-              key={index}
-              variant="ghost"
-              className="w-full text-left"
-              onClick={() => onHistoryItemClick(city)}
-            >
-              {city}
-            </Button>
-          ))}
-        </ScrollArea>
-      </CardContent>
-    </Card>
-  );
-};
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function App() {
-  const [city, setCity] = useState("");
-  const [weather, setWeather] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [error, setError] = useState("");
+  const [page, setPage] = useState("enter");
+  const [products, setProducts] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [newProduct, setNewProduct] = useState({ name: "", quantity: "", price: "" });
 
-  const fetchWeather = async (cityName) => {
-    try {
-      const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&units=metric&appid=${API_KEY}`
-      );
-      if (!response.ok) {
-        throw new Error("City not found");
+  const addProduct = () => {
+    if (newProduct.name && newProduct.quantity && newProduct.price) {
+      setProducts([...products, { ...newProduct, id: Date.now() }]);
+      setNewProduct({ name: "", quantity: "", price: "" });
+    }
+  };
+
+  const addToCart = (product, quantity) => {
+    setCart([...cart, { ...product, quantity }]);
+  };
+
+  const checkout = () => {
+    const updatedProducts = products.map(product => {
+      const cartItem = cart.find(item => item.id === product.id);
+      if (cartItem) {
+        return { ...product, quantity: product.quantity - cartItem.quantity };
       }
-      const data = await response.json();
-      setWeather(data);
-      setError("");
-      updateHistory(cityName);
-    } catch (err) {
-      setWeather(null);
-      setError(err.message);
-    }
-  };
-
-  const updateHistory = (cityName) => {
-    setHistory((prevHistory) => {
-      const newHistory = [cityName, ...prevHistory.filter((c) => c !== cityName)];
-      return newHistory.slice(0, 5);
+      return product;
     });
+    setProducts(updatedProducts);
+    setCart([]);
+    setPage("table");
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (city.trim()) {
-      fetchWeather(city);
-    }
+  const resetApp = () => {
+    setProducts([]);
+    setCart([]);
+    setPage("enter");
   };
 
-  const handleRefresh = () => {
-    if (weather) {
-      fetchWeather(weather.name);
-    }
-  };
+  const EnterProductPage = () => (
+    <div className="p-4 space-y-4">
+      <h2 className="text-2xl font-bold">Enter Product Details</h2>
+      <Input
+        placeholder="Product Name"
+        value={newProduct.name}
+        onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+      />
+      <Input
+        type="number"
+        placeholder="Quantity"
+        value={newProduct.quantity}
+        onChange={(e) => setNewProduct({ ...newProduct, quantity: parseInt(e.target.value) })}
+      />
+      <Input
+        type="number"
+        placeholder="Price"
+        value={newProduct.price}
+        onChange={(e) => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) })}
+      />
+      <Button onClick={addProduct}>Add Product</Button>
+      {products.length > 0 && (
+        <Button onClick={() => setPage("table")}>View Inventory</Button>
+      )}
+    </div>
+  );
 
-  const handleHistoryItemClick = (cityName) => {
-    setCity(cityName);
-    fetchWeather(cityName);
-  };
+  const InventoryTablePage = () => (
+    <div className="p-4 space-y-4">
+      <h2 className="text-2xl font-bold">Inventory</h2>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Quantity</TableHead>
+            <TableHead>Price</TableHead>
+            <TableHead>Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {products.map((product) => (
+            <TableRow key={product.id}>
+              <TableCell>{product.name}</TableCell>
+              <TableCell>{product.quantity}</TableCell>
+              <TableCell>${product.price}</TableCell>
+              <TableCell>
+                <Input
+                  type="number"
+                  placeholder="Qty"
+                  className="w-20 mr-2"
+                  onChange={(e) => {
+                    if (e.target.value <= product.quantity) {
+                      addToCart(product, parseInt(e.target.value));
+                    }
+                  }}
+                />
+                <Button onClick={() => addToCart(product, 1)}>Add to Cart</Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <div className="flex justify-between">
+        <Button onClick={() => setPage("enter")}>Add More Products</Button>
+        <Button onClick={() => setPage("checkout")}>Checkout</Button>
+        <Button onClick={resetApp}>Reset</Button>
+      </div>
+    </div>
+  );
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${API_KEY}`
-          )
-            .then((response) => response.json())
-            .then((data) => {
-              setWeather(data);
-              updateHistory(data.name);
-            })
-            .catch((err) => setError("Error fetching weather data"));
-        },
-        (err) => setError("Error getting location")
-      );
-    } else {
-      setError("Geolocation is not supported by this browser");
-    }
-  }, []);
+  const CheckoutPage = () => {
+    const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    return (
+      <div className="p-4 space-y-4">
+        <h2 className="text-2xl font-bold">Checkout</h2>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Quantity</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {cart.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell>{item.name}</TableCell>
+                <TableCell>{item.quantity}</TableCell>
+                <TableCell>${item.price}</TableCell>
+                <TableCell>${item.price * item.quantity}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <div className="text-xl font-bold">Total: ${total.toFixed(2)}</div>
+        <Button onClick={checkout}>Done</Button>
+      </div>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-      <h1 className="text-3xl font-bold mb-6">Weather Dashboard</h1>
-      <form onSubmit={handleSubmit} className="w-full max-w-md mb-4">
-        <div className="flex">
-          <Input
-            type="text"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="Enter city name"
-            className="flex-grow mr-2"
-          />
-          <Button type="submit">Search</Button>
-        </div>
-      </form>
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-      {weather && (
-        <div className="w-full max-w-md mb-4">
-          <WeatherCard weather={weather} />
-          <Button onClick={handleRefresh} className="mt-2 w-full">
-            Refresh
-          </Button>
-        </div>
-      )}
-      <HistoryPanel history={history} onHistoryItemClick={handleHistoryItemClick} />
+    <div className="container mx-auto max-w-3xl">
+      {page === "enter" && <EnterProductPage />}
+      {page === "table" && <InventoryTablePage />}
+      {page === "checkout" && <CheckoutPage />}
     </div>
   );
 }
