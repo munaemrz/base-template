@@ -1,29 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
-
-// Predefined list of valid countries and major cities
-const validLocations = [
-  "United States",
-  "Canada",
-  "India",
-  "Germany",
-  "France",
-  "New York",
-  "Los Angeles",
-  "London",
-  "Paris",
-  "Berlin",
-  "Tokyo",
-  "Beijing",
-  "Sydney",
-  "Mexico City",
-];
 
 function extractStats(text) {
-  // Extract numbers in sentences with "in [year]" or percentage-related context
   const numberPattern = /in\s(\d{4}).*?by\s(\d+)%/gi;
   const matches = [...text.matchAll(numberPattern)];
   const numbers = matches.map((match) => ({
@@ -31,12 +8,10 @@ function extractStats(text) {
     percentage: parseInt(match[2]),
   }));
 
-  // Extract valid locations
   const locationPattern = /\b[A-Z][a-z]+(?: [A-Z][a-z]+)*\b/g;
   const allLocations = text.match(locationPattern) || [];
-  const locations = allLocations.filter((loc) => validLocations.includes(loc));
+  const locations = allLocations.filter((loc) => worldMapCoordinates[loc]);
 
-  // Extract keywords (5+ letter words, top 5 unique)
   const keywordPattern = /\b[A-Za-z]{5,}\b/g;
   const keywords = [...new Set(text.match(keywordPattern) || [])].slice(0, 5);
 
@@ -46,34 +21,60 @@ function extractStats(text) {
     keywords,
   };
 }
+const worldMapCoordinates = {
+  "United States": { lat: 37.7749, lon: -122.4194 }, // San Francisco, USA
+  "India": { lat: 28.6139, lon: 77.209 }, // Delhi, India
+  "Germany": { lat: 52.5200, lon: 13.405 }, // Berlin, Germany
+  "France": { lat: 48.8566, lon: 2.3522 }, // Paris, France
+  "Canada": { lat: 56.1304, lon: -106.3468 }, // Canada (Central)
+};
+function latLonToSvg(lat, lon, width, height) {
+  const x = ((lon + 180) / 360) * width; // Longitude to x
+  const y =
+    ((1 - Math.log(Math.tan((Math.PI / 4) + (lat * Math.PI) / 360)) / Math.PI) /
+      2) *
+    height; // Latitude to y
+  return { x: Math.round(x), y: Math.round(y) };
+}
+
 
 const BarChart = ({ data, title }) => (
-  <div className="w-full">
-    <h3 className="text-center font-bold mb-2">{title}</h3>
-    <TooltipProvider>
-      <div className="flex flex-col space-y-2">
-        {data.map((entry, index) => (
-          <div key={index} className="flex items-center">
-            <span className="w-12 text-sm text-right mr-2">{entry.year}</span>
-            <Tooltip content={`${entry.percentage}%`} placement="top">
-              <div
-                className="bg-blue-500 h-6 text-xs text-white flex items-center justify-center"
-                style={{ width: `${entry.percentage}%` }}
-              >
-                {entry.percentage}%
-              </div>
-            </Tooltip>
-          </div>
-        ))}
-      </div>
-    </TooltipProvider>
+  <div style={{ flex: 1, padding: "16px" }}>
+    <h3 style={{ textAlign: "center", fontWeight: "bold", marginBottom: "16px" }}>
+      {title}
+    </h3>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-around",
+        height: "200px",
+        alignItems: "flex-end",
+      }}
+    >
+      {data.map((entry, index) => (
+        <div key={index} style={{ textAlign: "center" }}>
+          <div
+            style={{
+              backgroundColor: "#1E90FF",
+              height: `${entry.percentage * 2}px`,
+              width: "20px",
+              margin: "auto",
+            }}
+          ></div>
+          <div style={{ marginTop: "8px", fontSize: "12px" }}>{entry.year}</div>
+          <div style={{ fontSize: "10px", color: "gray" }}>{entry.percentage}%</div>
+        </div>
+      ))}
+    </div>
   </div>
 );
 
 const PieChart = ({ data, title }) => (
-  <div className="w-40 h-40 relative mx-auto">
-    <h3 className="text-center font-bold mb-2">{title}</h3>
-    <svg viewBox="0 0 32 32" className="w-full h-full">
+  <div style={{ flex: 1, padding: "16px" }}>
+    <h3 style={{ textAlign: "center", fontWeight: "bold", marginBottom: "16px" }}>
+      {title}
+    </h3>
+    <svg viewBox="0 0 32 32" style={{ width: "100%", height: "200px" }}>
       {data.reduce(
         (acc, keyword, i) => {
           const startAngle = acc.startAngle;
@@ -93,10 +94,10 @@ const PieChart = ({ data, title }) => (
               />,
               <text
                 key={`label-${i}`}
-                x={16 + 12 * Math.cos((Math.PI * (startAngle + endAngle)) / 360)}
-                y={16 - 12 * Math.sin((Math.PI * (startAngle + endAngle)) / 360)}
-                fontSize="0.1rem"
-                fill="#000"
+                x={16 + 10 * Math.cos((Math.PI * (startAngle + endAngle)) / 360)}
+                y={16 - 10 * Math.sin((Math.PI * (startAngle + endAngle)) / 360)}
+                fontSize="1.5"
+                fill="black"
                 textAnchor="middle"
               >
                 {keyword}
@@ -111,30 +112,59 @@ const PieChart = ({ data, title }) => (
   </div>
 );
 
-const Map = ({ locations, onClickLocation }) => (
-  <div className="relative w-full h-64 bg-gray-100 rounded">
-    {locations.map((loc, idx) => (
-      <div
-        key={idx}
-        className="absolute flex items-center justify-center"
-        style={{
-          left: `${Math.random() * 90}%`,
-          top: `${Math.random() * 90}%`,
-        }}
+const Map = ({ locations, onClickLocation }) => {
+  const mapWidth = 1000;
+  const mapHeight = 500;
+
+  return (
+    <div style={{ width: "100%", height: "400px", position: "relative" }}>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox={`0 0 ${mapWidth} ${mapHeight}`}
+        style={{ width: "100%", height: "100%" }}
       >
-        <TooltipProvider>
-          <Tooltip content={loc}>
-            <div
-              className="bg-red-500 w-2 h-2 rounded-full cursor-pointer"
-              onClick={() => onClickLocation(loc)}
-            ></div>
-          </Tooltip>
-        </TooltipProvider>
-        <span className="absolute top-4 text-xs">{loc}</span>
-      </div>
-    ))}
-  </div>
-);
+        <image
+          href="https://upload.wikimedia.org/wikipedia/commons/4/41/Simple_world_map.svg"
+          x="0"
+          y="0"
+          width={mapWidth}
+          height={mapHeight}
+        />
+        {locations.map((loc, idx) => {
+          const coords = worldMapCoordinates[loc];
+          if (!coords) return null;
+          const { x, y } = latLonToSvg(
+            coords.lat,
+            coords.lon,
+            mapWidth,
+            mapHeight
+          );
+          return (
+            <g key={idx}>
+              <circle
+                cx={x}
+                cy={y}
+                r={8}
+                fill="red"
+                onClick={() => onClickLocation(loc)}
+                style={{ cursor: "pointer" }}
+              />
+              <text
+                x={x + 10}
+                y={y}
+                fontSize="12"
+                fill="black"
+                textAnchor="start"
+              >
+                {loc}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+};
 
 export default function App() {
   const [text, setText] = useState("");
@@ -146,40 +176,58 @@ export default function App() {
   }, [text]);
 
   return (
-    <div className="max-w-xl mx-auto p-4">
-      <Card>
-        <CardTitle>
-          <h1 className="text-xl font-bold">Article Visualizer</h1>
-        </CardTitle>
-        <CardContent>
-          <Textarea
-            placeholder="Paste your article here..."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="w-full"
-          />
-        </CardContent>
-        <CardFooter>
-          <Button onClick={() => setText("")}>Clear</Button>
-        </CardFooter>
-      </Card>
-      {stats.numbers.length > 0 && (
-        <div className="mt-4 space-y-4">
-          <BarChart data={stats.numbers} title="Numbers in Context" />
-          <PieChart data={stats.keywords} title="Key Topics" />
+    <div style={{ maxWidth: "1200px", margin: "auto", padding: "16px" }}>
+      <textarea
+        placeholder="Paste your article here..."
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        style={{
+          width: "100%",
+          height: "100px",
+          borderRadius: "8px",
+          border: "1px solid #ccc",
+          padding: "8px",
+          fontSize: "14px",
+          marginBottom: "16px",
+        }}
+      />
+      <button
+        onClick={() => setText("")}
+        style={{
+          marginBottom: "16px",
+          padding: "8px 16px",
+          backgroundColor: "#1E90FF",
+          color: "white",
+          border: "none",
+          borderRadius: "4px",
+          cursor: "pointer",
+        }}
+      >
+        Clear
+      </button>
+      {stats.numbers.length > 0 || stats.locations.length > 0 || stats.keywords.length > 0 ? (
+        <div>
+          <div style={{ display: "flex", marginBottom: "16px" }}>
+            <BarChart data={stats.numbers} title="Numbers in Context" />
+            <PieChart data={stats.keywords} title="Key Topics" />
+          </div>
           <Map
             locations={stats.locations}
             onClickLocation={(loc) => setSelectedLocation(loc)}
           />
           {selectedLocation && (
-            <div className="text-center mt-4">
-              <p className="text-lg font-semibold">
+            <div style={{ textAlign: "center", marginTop: "16px" }}>
+              <p style={{ fontWeight: "bold", fontSize: "18px" }}>
                 Details about: {selectedLocation}
               </p>
               <p>Extracted details related to this location go here.</p>
             </div>
           )}
         </div>
+      ) : (
+        <p style={{ textAlign: "center", marginTop: "16px" }}>
+          No data extracted from the article. Try another input.
+        </p>
       )}
     </div>
   );
