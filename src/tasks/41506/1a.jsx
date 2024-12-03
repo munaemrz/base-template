@@ -1,115 +1,161 @@
-import React, { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { Tooltip } from "@/components/ui/tooltip";
+import React, { useState } from 'react';
+import { Button, Input, Card, CardHeader, CardBody, CardFooter } from "@material-tailwind/react";
 
-const NLPProcessor = (text) => {
-  const numbers = text.match(/\d+(\.\d+)?%?/g) || [];
-  const keywords = text.match(/\b[A-Z][a-z]+\b/g) || [];
-  const locations = text.match(/\b(New York|Los Angeles|Chicago|Houston|Phoenix|Philadelphia|San Antonio|San Diego|Dallas|San Jose)\b/g) || [];
-  return { numbers, keywords, locations };
-};
+function App() {
+  const [quizzes, setQuizzes] = useState([]);
+  const [currentQuiz, setCurrentQuiz] = useState({ name: '', questions: [] });
+  const [isCreating, setIsCreating] = useState(true);
+  const [attemptedQuiz, setAttemptedQuiz] = useState(null);
 
-const BarChart = ({ data }) => (
-  <div className="flex h-40 items-end space-x-2">
-    {data.map((value, index) => (
-      <div
-        key={index}
-        className="bg-blue-500 w-8"
-        style={{ height: `${(value / Math.max(...data)) * 100}%` }}
-      >
-        <Tooltip content={value}>
-          <div className="h-full"></div>
-        </Tooltip>
-      </div>
-    ))}
-  </div>
-);
+  const handleCreateQuestion = () => {
+    setCurrentQuiz({
+      ...currentQuiz,
+      questions: [...currentQuiz.questions, { question: '', answers: ['', '', '', ''], correctAnswer: 0 }]
+    });
+  };
 
-const PieChart = ({ data }) => (
-  <div className="relative w-40 h-40">
-    {data.map((value, index) => (
-      <div
-        key={index}
-        className="absolute inset-0"
-        style={{
-          background: `conic-gradient(from ${index * 360 / data.length}deg, hsl(${index * 360 / data.length}, 70%, 50%) ${value}%, transparent ${value}%)`,
-        }}
-      >
-        <Tooltip content={`${value}%`}>
-          <div className="h-full"></div>
-        </Tooltip>
-      </div>
-    ))}
-  </div>
-);
-
-const USMap = ({ locations }) => (
-  <svg viewBox="0 0 959 593" className="w-full h-auto">
-    <path d="M161.1 453.7l-0.3 85.4 1.6 1 3.1 0.2 1.5-1.1h2.6l0.2 2.9 7 6.8 0.5 2.6 3.4-1.9 0.6-0.2 0.3-3.1 1-0.5 1.6-2.6 1.5-3.7 1.6-0.8 1.5 1.6 2.3-0.5 1.6-1.5 1.9-0.8 0.3-2.1 1.6-1.5 1.1-0.5 1.9-0.8 1.5 1.3 2.7 0.3 0.5-1.9 0.6-1.9 0.6-2.4 2.1-1.3 0.8-2.4 1.3-1.5 1.6-1 1.3-0.3 0.6 0.5h0.8l1.3-3.7 4.2-2.1 4.7-1.8 1.3 0.3 2.9 2.9 1.6 0.5 1 0.3 3.1-1.3 2.7-3.1v-1l0.6-0.8v-1.9l3.1-1.8 0.8-1.5 0.5-1.1 0.3-1.9-0.5-1.6 0.8-1.5h1.9l1.1-0.5 0.8-1.5 0.8-1.5 1.9-3.7 2.7-1.3 2.1-1.3" fill="#D3D3D3" />
-    {locations.map((location, index) => (
-      <circle key={index} cx={Math.random() * 959} cy={Math.random() * 593} r="5" fill="red">
-        <Tooltip content={location}>
-          <circle r="5" />
-        </Tooltip>
-      </circle>
-    ))}
-  </svg>
-);
-
-export default function App() {
-  const [input, setInput] = useState("");
-  const [error, setError] = useState("");
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    if (input.length < 50) {
-      setError("Please enter at least 50 characters");
-      setData(null);
-    } else {
-      setError("");
-      setData(NLPProcessor(input));
+  const handleSubmitQuiz = () => {
+    if (currentQuiz.name && currentQuiz.questions.length > 0) {
+      setQuizzes([...quizzes, currentQuiz]);
+      setCurrentQuiz({ name: '', questions: [] });
+      setIsCreating(false);
     }
-  }, [input]);
+  };
+
+  const handleAnswerChange = (questionIndex, answerIndex, value) => {
+    const updatedQuestions = currentQuiz.questions.map((q, qi) => 
+      qi === questionIndex ? { 
+        ...q, 
+        answers: q.answers.map((a, ai) => ai === answerIndex ? value : a)
+      } : q
+    );
+    setCurrentQuiz({...currentQuiz, questions: updatedQuestions});
+  };
+
+  const handleQuestionChange = (index, value) => {
+    const updatedQuestions = currentQuiz.questions.map((q, i) => i === index ? {...q, question: value} : q);
+    setCurrentQuiz({...currentQuiz, questions: updatedQuestions});
+  };
+
+  const handleCorrectAnswer = (questionIndex, answerIndex) => {
+    const updatedQuestions = currentQuiz.questions.map((q, i) => 
+      i === questionIndex ? {...q, correctAnswer: answerIndex} : q
+    );
+    setCurrentQuiz({...currentQuiz, questions: updatedQuestions});
+  };
+
+  const attemptQuiz = (quiz) => {
+    setAttemptedQuiz({ quiz, answers: Array(quiz.questions.length).fill(null) });
+  };
+
+  const submitAttempt = () => {
+    setAttemptedQuiz(null);
+    setIsCreating(false);
+  };
+
+  const QuizCreator = () => (
+    <Card className="mt-6 w-full sm:w-96">
+      <CardHeader color="blue-gray" className="mb-4">
+        <h2 className="text-2xl">Create a New Quiz</h2>
+      </CardHeader>
+      <CardBody>
+        <Input label="Quiz Name" value={currentQuiz.name} onChange={(e) => setCurrentQuiz({...currentQuiz, name: e.target.value})} />
+        {currentQuiz.questions.map((q, qi) => (
+          <div key={qi} className="mt-4">
+            <Input label={`Question ${qi + 1}`} value={q.question} onChange={(e) => handleQuestionChange(qi, e.target.value)} />
+            {q.answers.map((a, ai) => (
+              <div key={ai} className="flex items-center mt-2">
+                <Input label={`Answer ${ai + 1}`} value={a} onChange={(e) => handleAnswerChange(qi, ai, e.target.value)} />
+                <input type="radio" name={`correct-${qi}`} checked={q.correctAnswer === ai} onChange={() => handleCorrectAnswer(qi, ai)} className="ml-2" />
+              </div>
+            ))}
+          </div>
+        ))}
+        <Button onClick={handleCreateQuestion} className="mt-4">Add Question</Button>
+      </CardBody>
+      <CardFooter>
+        <Button onClick={handleSubmitQuiz}>Submit Quiz</Button>
+      </CardFooter>
+    </Card>
+  );
+
+  const QuizAttempt = ({ quiz, answers, onChangeAnswer, onSubmit }) => (
+    <Card className="mt-6 w-full sm:w-96">
+      <CardHeader color="blue-gray" className="mb-4">
+        <h2 className="text-2xl">{quiz.name}</h2>
+      </CardHeader>
+      <CardBody>
+        {quiz.questions.map((q, qi) => (
+          <div key={qi} className="mb-4">
+            <h3>{q.question}</h3>
+            {q.answers.map((a, ai) => (
+              <div key={ai} className="flex items-center">
+                <input type="radio" name={`question-${qi}`} checked={answers[qi] === ai} onChange={() => onChangeAnswer(qi, ai)} className="mr-2" />
+                <label>{a}</label>
+              </div>
+            ))}
+          </div>
+        ))}
+      </CardBody>
+      <CardFooter>
+        <Button onClick={onSubmit}>Submit Attempt</Button>
+      </CardFooter>
+    </Card>
+  );
+
+  const ResultView = ({ quiz, answers }) => {
+    let score = 0;
+    return (
+      <Card className="mt-6 w-full sm:w-96">
+        <CardHeader color="blue-gray" className="mb-4">
+          <h2 className="text-2xl">Results</h2>
+        </CardHeader>
+        <CardBody>
+          {quiz.questions.map((q, qi) => {
+            const isCorrect = q.correctAnswer === answers[qi];
+            if (isCorrect) score++;
+            return (
+              <div key={qi} className={`mb-4 ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                <p>{q.question}</p>
+                <p>Your Answer: {q.answers[answers[qi]]}</p>
+                <p>Correct Answer: {q.answers[q.correctAnswer]}</p>
+              </div>
+            );
+          })}
+          <p className="mt-4">Your Score: {score}/{quiz.questions.length}</p>
+        </CardBody>
+      </Card>
+    );
+  };
 
   return (
-    <div className="p-4 max-w-md mx-auto sm:max-w-xl">
-      <h1 className="text-2xl font-bold mb-4">Article Visualizer</h1>
-      <textarea
-        className="w-full p-2 border rounded"
-        rows="5"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="Paste your article here..."
-      />
-      {error && <p className="text-red-500 mt-2">{error}</p>}
-      {data && (
-        <div className="mt-4">
-          <Accordion type="single" collapsible>
-            <AccordionItem value="item-1">
-              <AccordionTrigger>Numbers</AccordionTrigger>
-              <AccordionContent>
-                <BarChart data={data.numbers.map(Number)} />
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-2">
-              <AccordionTrigger>Keywords</AccordionTrigger>
-              <AccordionContent>
-                <PieChart data={data.keywords.slice(0, 5).map((_, i) => 100 / 5)} />
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-3">
-              <AccordionTrigger>Locations</AccordionTrigger>
-              <AccordionContent>
-                <USMap locations={data.locations} />
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-          <Button className="mt-4" onClick={() => setInput("")}>
-            Clear
-          </Button>
+    <div className="App flex flex-col items-center p-4">
+      {isCreating ? <QuizCreator /> : attemptedQuiz ? (
+        attemptedQuiz.answers.some(a => a === null) ? (
+          <QuizAttempt 
+            quiz={attemptedQuiz.quiz} 
+            answers={attemptedQuiz.answers} 
+            onChangeAnswer={(qi, ai) => setAttemptedQuiz({...attemptedQuiz, answers: attemptedQuiz.answers.map((a, i) => i === qi ? ai : a)})}
+            onSubmit={() => setAttemptedQuiz({...attemptedQuiz, submitted: true})}
+          />
+        ) : (
+          <ResultView quiz={attemptedQuiz.quiz} answers={attemptedQuiz.answers} />
+        )
+      ) : (
+        <div>
+          <Button onClick={() => setIsCreating(true)} className="mb-4">Create New Quiz</Button>
+          {quizzes.map((quiz, idx) => (
+            <Card key={idx} className="mb-4 w-full sm:w-96">
+              <CardBody>
+                <h3>{quiz.name}</h3>
+                <Button onClick={() => attemptQuiz(quiz)}>Attempt Quiz</Button>
+              </CardBody>
+            </Card>
+          ))}
         </div>
       )}
     </div>
   );
 }
+
+export default App;

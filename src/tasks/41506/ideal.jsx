@@ -1,234 +1,218 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
-function extractStats(text) {
-  const numberPattern = /in\s(\d{4}).*?by\s(\d+)%/gi;
-  const matches = [...text.matchAll(numberPattern)];
-  const numbers = matches.map((match) => ({
-    year: parseInt(match[1]),
-    percentage: parseInt(match[2]),
-  }));
+const QuizCreator = ({ onSave }) => {
+  const [quizTitle, setQuizTitle] = useState("");
+  const [questions, setQuestions] = useState([]);
+  const [currentQuestion, setCurrentQuestion] = useState("");
+  const [options, setOptions] = useState(["", "", "", ""]);
+  const [correctAnswer, setCorrectAnswer] = useState("");
+  const [error, setError] = useState("");
 
-  const locationPattern = /\b[A-Z][a-z]+(?: [A-Z][a-z]+)*\b/g;
-  const allLocations = text.match(locationPattern) || [];
-  const locations = allLocations.filter((loc) => worldMapCoordinates[loc]);
-
-  const keywordPattern = /\b[A-Za-z]{5,}\b/g;
-  const keywords = [...new Set(text.match(keywordPattern) || [])].slice(0, 5);
-
-  return {
-    numbers,
-    locations,
-    keywords,
+  const handleAddQuestion = () => {
+    if (
+      currentQuestion.trim() &&
+      options.every((opt) => opt.trim()) &&
+      correctAnswer.trim()
+    ) {
+      const newQuestion = {
+        id: Date.now(),
+        question: currentQuestion,
+        options,
+        correctAnswer,
+      };
+      setQuestions([...questions, newQuestion]);
+      setCurrentQuestion("");
+      setOptions(["", "", "", ""]);
+      setCorrectAnswer("");
+      setError("");
+    } else {
+      setError("All fields must be filled to add a question.");
+    }
   };
-}
-const worldMapCoordinates = {
-  "United States": { lat: 37.7749, lon: -122.4194 }, // San Francisco, USA
-  "India": { lat: 28.6139, lon: 77.209 }, // Delhi, India
-  "Germany": { lat: 52.5200, lon: 13.405 }, // Berlin, Germany
-  "France": { lat: 48.8566, lon: 2.3522 }, // Paris, France
-  "Canada": { lat: 56.1304, lon: -106.3468 }, // Canada (Central)
-};
-function latLonToSvg(lat, lon, width, height) {
-  const x = ((lon + 180) / 360) * width; // Longitude to x
-  const y =
-    ((1 - Math.log(Math.tan((Math.PI / 4) + (lat * Math.PI) / 360)) / Math.PI) /
-      2) *
-    height; // Latitude to y
-  return { x: Math.round(x), y: Math.round(y) };
-}
 
-
-const BarChart = ({ data, title }) => (
-  <div style={{ flex: 1, padding: "16px" }}>
-    <h3 style={{ textAlign: "center", fontWeight: "bold", marginBottom: "16px" }}>
-      {title}
-    </h3>
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-around",
-        height: "200px",
-        alignItems: "flex-end",
-      }}
-    >
-      {data.map((entry, index) => (
-        <div key={index} style={{ textAlign: "center" }}>
-          <div
-            style={{
-              backgroundColor: "#1E90FF",
-              height: `${entry.percentage * 2}px`,
-              width: "20px",
-              margin: "auto",
-            }}
-          ></div>
-          <div style={{ marginTop: "8px", fontSize: "12px" }}>{entry.year}</div>
-          <div style={{ fontSize: "10px", color: "gray" }}>{entry.percentage}%</div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const PieChart = ({ data, title }) => (
-  <div style={{ flex: 1, padding: "16px" }}>
-    <h3 style={{ textAlign: "center", fontWeight: "bold", marginBottom: "16px" }}>
-      {title}
-    </h3>
-    <svg viewBox="0 0 32 32" style={{ width: "100%", height: "200px" }}>
-      {data.reduce(
-        (acc, keyword, i) => {
-          const startAngle = acc.startAngle;
-          const endAngle = startAngle + (360 / data.length);
-          const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
-          const x1 = 16 + 16 * Math.cos((Math.PI * startAngle) / 180);
-          const y1 = 16 - 16 * Math.sin((Math.PI * startAngle) / 180);
-          const x2 = 16 + 16 * Math.cos((Math.PI * endAngle) / 180);
-          const y2 = 16 - 16 * Math.sin((Math.PI * endAngle) / 180);
-          return {
-            paths: [
-              ...acc.paths,
-              <path
-                key={i}
-                d={`M16,16 L${x1},${y1} A16,16 0 ${largeArcFlag},1 ${x2},${y2} Z`}
-                fill={`hsl(${i * 72}, 70%, 50%)`}
-              />,
-              <text
-                key={`label-${i}`}
-                x={16 + 10 * Math.cos((Math.PI * (startAngle + endAngle)) / 360)}
-                y={16 - 10 * Math.sin((Math.PI * (startAngle + endAngle)) / 360)}
-                fontSize="1.5"
-                fill="black"
-                textAnchor="middle"
-              >
-                {keyword}
-              </text>,
-            ],
-            startAngle: endAngle,
-          };
-        },
-        { paths: [], startAngle: 0 }
-      ).paths}
-    </svg>
-  </div>
-);
-
-const Map = ({ locations, onClickLocation }) => {
-  const mapWidth = 1000;
-  const mapHeight = 500;
+  const handleSaveQuiz = () => {
+    if (quizTitle.trim() && questions.length) {
+      onSave({ title: quizTitle, questions });
+      setQuizTitle("");
+      setQuestions([]);
+    }
+  };
 
   return (
-    <div style={{ width: "100%", height: "400px", position: "relative" }}>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox={`0 0 ${mapWidth} ${mapHeight}`}
-        style={{ width: "100%", height: "100%" }}
-      >
-        <image
-          href="https://upload.wikimedia.org/wikipedia/commons/4/41/Simple_world_map.svg"
-          x="0"
-          y="0"
-          width={mapWidth}
-          height={mapHeight}
+    <Card className="p-6 space-y-4 bg-blue-50 shadow-lg rounded-lg">
+      <h2 className="text-2xl font-semibold">Create a New Quiz</h2>
+      <Input
+        placeholder="Quiz Title"
+        value={quizTitle}
+        onChange={(e) => setQuizTitle(e.target.value)}
+        className="w-full"
+      />
+      <Input
+        placeholder="Question"
+        value={currentQuestion}
+        onChange={(e) => setCurrentQuestion(e.target.value)}
+        className="w-full"
+      />
+      {options.map((opt, index) => (
+        <Input
+          key={index}
+          placeholder={`Option ${index + 1}`}
+          value={opt}
+          onChange={(e) =>
+            setOptions((prev) => {
+              const newOptions = [...prev];
+              newOptions[index] = e.target.value;
+              return newOptions;
+            })
+          }
+          className="w-full"
         />
-        {locations.map((loc, idx) => {
-          const coords = worldMapCoordinates[loc];
-          if (!coords) return null;
-          const { x, y } = latLonToSvg(
-            coords.lat,
-            coords.lon,
-            mapWidth,
-            mapHeight
-          );
-          return (
-            <g key={idx}>
-              <circle
-                cx={x}
-                cy={y}
-                r={8}
-                fill="red"
-                onClick={() => onClickLocation(loc)}
-                style={{ cursor: "pointer" }}
-              />
-              <text
-                x={x + 10}
-                y={y}
-                fontSize="12"
-                fill="black"
-                textAnchor="start"
-              >
-                {loc}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-    </div>
+      ))}
+      <Input
+        placeholder="Correct Answer"
+        value={correctAnswer}
+        onChange={(e) => setCorrectAnswer(e.target.value)}
+        className="w-full"
+      />
+      {error && <p className="text-red-500">{error}</p>}
+      <div className="flex justify-between">
+        <Button onClick={handleAddQuestion} className="bg-green-500 hover:bg-green-600">
+          Add Question
+        </Button>
+        <Button
+          onClick={handleSaveQuiz}
+          className="bg-blue-500 hover:bg-blue-600"
+          disabled={!questions.length}
+        >
+          Save Quiz
+        </Button>
+      </div>
+    </Card>
   );
 };
 
-export default function App() {
-  const [text, setText] = useState("");
-  const [stats, setStats] = useState({ numbers: [], locations: [], keywords: [] });
-  const [selectedLocation, setSelectedLocation] = useState("");
+const QuizAttempt = ({ quiz, onComplete }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [showResults, setShowResults] = useState(false);
 
-  useEffect(() => {
-    setStats(extractStats(text));
-  }, [text]);
+  const handleNext = () => {
+    if (currentIndex < quiz.questions.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      setShowResults(true);
+    }
+  };
+
+  const handleAnswerChange = (answer) => {
+    setAnswers({ ...answers, [quiz.questions[currentIndex].id]: answer });
+  };
+
+  const calculateScore = () => {
+    return quiz.questions.reduce((acc, question) => {
+      return acc + (answers[question.id] === question.correctAnswer ? 1 : 0);
+    }, 0);
+  };
 
   return (
-    <div style={{ maxWidth: "1200px", margin: "auto", padding: "16px" }}>
-      <textarea
-        placeholder="Paste your article here..."
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        style={{
-          width: "100%",
-          height: "100px",
-          borderRadius: "8px",
-          border: "1px solid #ccc",
-          padding: "8px",
-          fontSize: "14px",
-          marginBottom: "16px",
-        }}
-      />
-      <button
-        onClick={() => setText("")}
-        style={{
-          marginBottom: "16px",
-          padding: "8px 16px",
-          backgroundColor: "#1E90FF",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-          cursor: "pointer",
-        }}
-      >
-        Clear
-      </button>
-      {stats.numbers.length > 0 || stats.locations.length > 0 || stats.keywords.length > 0 ? (
-        <div>
-          <div style={{ display: "flex", marginBottom: "16px" }}>
-            <BarChart data={stats.numbers} title="Numbers in Context" />
-            <PieChart data={stats.keywords} title="Key Topics" />
-          </div>
-          <Map
-            locations={stats.locations}
-            onClickLocation={(loc) => setSelectedLocation(loc)}
-          />
-          {selectedLocation && (
-            <div style={{ textAlign: "center", marginTop: "16px" }}>
-              <p style={{ fontWeight: "bold", fontSize: "18px" }}>
-                Details about: {selectedLocation}
-              </p>
-              <p>Extracted details related to this location go here.</p>
-            </div>
-          )}
-        </div>
+    <Card className="p-6 space-y-4 bg-gray-50 shadow-lg rounded-lg">
+      {!showResults ? (
+        <>
+          <h2 className="text-xl font-semibold">{quiz.title}</h2>
+          <p className="text-lg font-medium">{quiz.questions[currentIndex].question}</p>
+          {quiz.questions[currentIndex].options.map((opt) => (
+            <label
+              key={opt}
+              className={`block p-2 rounded ${
+                answers[quiz.questions[currentIndex].id] === opt ? "bg-gray-200" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name={quiz.questions[currentIndex].id}
+                value={opt}
+                checked={answers[quiz.questions[currentIndex].id] === opt}
+                onChange={() => handleAnswerChange(opt)}
+              />
+              {opt}
+            </label>
+          ))}
+          <Button
+            onClick={handleNext}
+            className="bg-blue-500 hover:bg-blue-600"
+          >
+            {currentIndex === quiz.questions.length - 1 ? "Submit Quiz" : "Next Question"}
+          </Button>
+        </>
       ) : (
-        <p style={{ textAlign: "center", marginTop: "16px" }}>
-          No data extracted from the article. Try another input.
-        </p>
+        <>
+          <h2 className="text-xl font-semibold">Quiz Results</h2>
+          {quiz.questions.map((question) => (
+            <div
+              key={question.id}
+              className={`p-4 rounded mb-2 ${
+                answers[question.id] === question.correctAnswer
+                  ? "bg-green-100"
+                  : "bg-red-100"
+              }`}
+            >
+              <p className="font-medium">{question.question}</p>
+              <p>
+                <span className="font-semibold">Your Answer:</span> {answers[question.id]}
+              </p>
+              <p className="text-green-700">
+                <span className="font-semibold">Correct Answer:</span> {question.correctAnswer}
+              </p>
+            </div>
+          ))}
+          <p className="text-lg font-medium mt-4">
+            Your Score: {calculateScore()} / {quiz.questions.length}
+          </p>
+          <Button onClick={onComplete} className="bg-blue-500 hover:bg-blue-600 mt-4">
+            Back to Homepage
+          </Button>
+        </>
+      )}
+    </Card>
+  );
+};
+
+const App = () => {
+  const [quizzes, setQuizzes] = useState([]);
+  const [selectedQuiz, setSelectedQuiz] = useState(null);
+
+  const handleSaveQuiz = (quiz) => {
+    setQuizzes([...quizzes, { ...quiz, id: Date.now() }]);
+  };
+
+  return (
+    <div className="container mx-auto p-6 max-w-4xl space-y-6">
+      <h1 className="text-3xl font-bold text-center mb-6">Trivia Quiz Creator</h1>
+      {selectedQuiz ? (
+        <QuizAttempt quiz={selectedQuiz} onComplete={() => setSelectedQuiz(null)} />
+      ) : (
+        <>
+          <QuizCreator onSave={handleSaveQuiz} />
+          <div className="grid gap-4">
+            {quizzes.map((quiz) => (
+              <Card key={quiz.id} className="p-4 shadow-md">
+                <h3 className="text-lg font-semibold">{quiz.title}</h3>
+                <Button
+                  onClick={() => setSelectedQuiz(quiz)}
+                  className="bg-blue-500 hover:bg-blue-600 mt-2"
+                >
+                  Attempt Quiz
+                </Button>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
-}
+};
+
+export default App;

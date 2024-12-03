@@ -1,99 +1,192 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { PieChart, BarChart } from "./Charts"; // Assume these are custom components for charts
+const QuizCreator = ({ onQuizCreated }) => {
+  const [questions, setQuestions] = useState([]);
+  const [currentQuestion, setCurrentQuestion] = useState("");
+  const [options, setOptions] = useState(["", "", "", ""]);
+  const [correctAnswer, setCorrectAnswer] = useState("");
 
-function extractStats(text) {
-  const numbers = text.match(/\b\d+(?:[.,]\d+)?\b/g) || [];
-  const keywords = text.match(/\b\w{5,}\b/g) || [];
-  const locations = text.match(/\b[A-Z][a-z]+(?: [A-Z][a-z]+)*\b/g) || [];
-  return {
-    numbers,
-    keywords: [...new Set(keywords)].slice(0, 5),
-    locations: [...new Set(locations)],
+  const addQuestion = () => {
+    if (currentQuestion && options.every((opt) => opt) && correctAnswer) {
+      setQuestions([
+        ...questions,
+        { question: currentQuestion, options, correctAnswer },
+      ]);
+      setCurrentQuestion("");
+      setOptions(["", "", "", ""]);
+      setCorrectAnswer("");
+    }
   };
-}
 
-function Map({ locations }) {
+  const createQuiz = () => {
+    if (questions.length > 0) {
+      onQuizCreated(questions);
+    }
+  };
+
   return (
-    <div className="relative w-full h-64 bg-gray-100 rounded">
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <p className="text-xs">Map Placeholder</p>
-        {locations.map((loc, idx) => (
-          <Tooltip key={idx} content={loc}>
-            <div
-              className="absolute bg-blue-500 w-2 h-2 rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle>Create Quiz</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="question">Question</Label>
+            <Input
+              id="question"
+              value={currentQuestion}
+              onChange={(e) => setCurrentQuestion(e.target.value)}
             />
-          </Tooltip>
-        ))}
-      </div>
-    </div>
+          </div>
+          {options.map((option, index) => (
+            <div key={index}>
+              <Label htmlFor={`option-${index}`}>Option {index + 1}</Label>
+              <Input
+                id={`option-${index}`}
+                value={option}
+                onChange={(e) => {
+                  const newOptions = [...options];
+                  newOptions[index] = e.target.value;
+                  setOptions(newOptions);
+                }}
+              />
+            </div>
+          ))}
+          <div>
+            <Label htmlFor="correct-answer">Correct Answer</Label>
+            <Input
+              id="correct-answer"
+              value={correctAnswer}
+              onChange={(e) => setCorrectAnswer(e.target.value)}
+            />
+          </div>
+          <Button onClick={addQuestion}>Add Question</Button>
+          <Button onClick={createQuiz}>Create Quiz</Button>
+        </div>
+      </CardContent>
+    </Card>
   );
-}
+};
+
+const QuizTaker = ({ quiz, onQuizCompleted }) => {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswers, setSelectedAnswers] = useState([]);
+
+  const handleAnswer = (answer) => {
+    setSelectedAnswers([...selectedAnswers, answer]);
+    if (currentQuestionIndex < quiz.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      onQuizCompleted(selectedAnswers);
+    }
+  };
+
+  if (currentQuestionIndex >= quiz.length) {
+    return null;
+  }
+
+  const currentQuestion = quiz[currentQuestionIndex];
+
+  return (
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle>Question {currentQuestionIndex + 1}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-4">{currentQuestion.question}</p>
+        <RadioGroup
+          onValueChange={handleAnswer}
+          className="space-y-2"
+        >
+          {currentQuestion.options.map((option, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <RadioGroupItem value={option} id={`option-${index}`} />
+              <Label htmlFor={`option-${index}`}>{option}</Label>
+            </div>
+          ))}
+        </RadioGroup>
+      </CardContent>
+    </Card>
+  );
+};
+
+const QuizResults = ({ quiz, userAnswers }) => {
+  const score = quiz.reduce(
+    (acc, question, index) =>
+      question.correctAnswer === userAnswers[index] ? acc + 1 : acc,
+    0
+  );
+
+  return (
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle>Quiz Results</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-4">
+          Your score: {score} out of {quiz.length}
+        </p>
+        {quiz.map((question, index) => (
+          <div key={index} className="mb-4">
+            <p className="font-semibold">{question.question}</p>
+            <p
+              className={
+                question.correctAnswer === userAnswers[index]
+                  ? "text-green-600"
+                  : "text-red-600"
+              }
+            >
+              Your answer: {userAnswers[index]}
+            </p>
+            <p className="text-green-600">
+              Correct answer: {question.correctAnswer}
+            </p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function App() {
-  const [text, setText] = useState("");
-  const [stats, setStats] = useState({
-    numbers: [],
-    keywords: [],
-    locations: [],
-  });
-  const [error, setError] = useState("");
+  const [quiz, setQuiz] = useState(null);
+  const [quizCompleted, setQuizCompleted] = useState(false);
+  const [userAnswers, setUserAnswers] = useState([]);
 
-  useEffect(() => {
-    if (text.length > 0 && text.length < 50) {
-      setError("Input must be at least 50 characters long.");
-    } else if (text.length === 0) {
-      setError("Please enter some text.");
-    } else {
-      setError("");
-      setStats(extractStats(text));
-    }
-  }, [text]);
+  const handleQuizCreated = (newQuiz) => {
+    setQuiz(newQuiz);
+  };
 
-  const handleTextChange = (e) => {
-    setText(e.target.value);
+  const handleQuizCompleted = (answers) => {
+    setUserAnswers(answers);
+    setQuizCompleted(true);
+  };
+
+  const resetQuiz = () => {
+    setQuiz(null);
+    setQuizCompleted(false);
+    setUserAnswers([]);
   };
 
   return (
-    <div className="flex flex-col items-center p-4 sm:p-8 space-y-4">
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-bold">Article Visualizer</h2>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            placeholder="Paste or type your article here..."
-            value={text}
-            onChange={handleTextChange}
-            className="w-full min-h-[200px]"
-          />
-          {error && <p className="text-red-500 text-xs italic">{error}</p>}
-        </CardContent>
-        <CardFooter>
-          <Button onClick={() => setText("")}>Clear</Button>
-        </CardFooter>
-      </Card>
-
-      {stats.numbers.length > 0 && (
-        <div className="w-full space-y-4">
-          <BarChart data={stats.numbers} title="Numbers in Article" />
-          <PieChart
-            data={stats.keywords.map((k) => ({ name: k, value: 1 }))}
-            title="Key Topics"
-          />
-          <Map locations={stats.locations} />
+    <div className="container mx-auto p-4 sm:p-6 max-w-3xl">
+      <h1 className="text-3xl font-bold mb-6 text-center">
+        Trivia Quiz Creator
+      </h1>
+      {!quiz && <QuizCreator onQuizCreated={handleQuizCreated} />}
+      {quiz && !quizCompleted && (
+        <QuizTaker quiz={quiz} onQuizCompleted={handleQuizCompleted} />
+      )}
+      {quizCompleted && <QuizResults quiz={quiz} userAnswers={userAnswers} />}
+      {(quiz || quizCompleted) && (
+        <div className="mt-6 text-center">
+          <Button onClick={resetQuiz}>Create New Quiz</Button>
         </div>
       )}
     </div>
