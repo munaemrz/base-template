@@ -31,14 +31,22 @@ const GiftForm = ({ gift, onSave, onCancel, totalBudget, budgetUsed }) => {
 
     if (formData.recipient && formData.occasion && budget >= 0 && formData.status) {
       onSave({ ...formData, budget });
-      setFormData({ id: null, recipient: "", occasion: "", budget: "", status: "Pending" });
       setError("");
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-4 bg-white shadow rounded-lg">
-      <h2 className="text-lg font-semibold mb-4">Add or Edit Gift</h2>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">{gift ? "Edit Gift" : "Add New Gift"}</h2>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-xl font-semibold text-gray-500 hover:text-gray-800"
+        >
+          &times;
+        </button>
+      </div>
       <Input
         name="recipient"
         value={formData.recipient}
@@ -85,54 +93,92 @@ const GiftForm = ({ gift, onSave, onCancel, totalBudget, budgetUsed }) => {
   );
 };
 
-const CategorizedGiftList = ({ gifts, onEdit, onDelete }) => {
+const CategorizedGiftList = ({ gifts, onEdit, onDelete, filterOccasion, setFilterOccasion }) => {
   const categorizedGifts = gifts.reduce((acc, gift) => {
-    acc[gift.occasion] = acc[gift.occasion] || [];
-    acc[gift.occasion].push(gift);
+    const occasion = gift.occasion.toLowerCase(); // Normalize categories
+    acc[occasion] = acc[occasion] || [];
+    acc[occasion].push(gift);
     return acc;
   }, {});
 
+  const occasions = Object.keys(categorizedGifts);
+
   return (
-   <>
-   {gifts.length > 0 && (
-      <Card className="mb-4">
-    <h2 className="text-lg font-semibold mb-4 p-2">Gifts by Occasion</h2>
-    {Object.keys(categorizedGifts).length > 0 ? (
-      <div className="">
-        {Object.entries(categorizedGifts).map(([occasion, gifts]) => (
-          <div key={occasion} className="p-4 bg-gray-50 rounded-lg shadow">
-            <h3 className="text-md font-semibold mb-2">{occasion}</h3>
-            <ul className="space-y-2">
-              {gifts.map((gift) => (
-                <li
-                  key={gift.id}
-                  className={`flex justify-between items-center p-2 rounded ${
-                    gift.status === "Purchased" ? "bg-green-100" : "bg-yellow-100"
-                  }`}
+    <Card className="p-4 bg-white rounded-lg shadow">
+      <h2 className="text-lg font-semibold mb-4">Gifts</h2>
+      <div className="flex flex-wrap gap-2 mb-4">
+        <Button
+          variant={filterOccasion === "" ? "default" : "outline"}
+          onClick={() => setFilterOccasion("")}
+        >
+          All
+        </Button>
+        {occasions.map((occasion) => (
+          <Button
+            key={occasion}
+            variant={filterOccasion === occasion ? "default" : "outline"}
+            onClick={() => setFilterOccasion(occasion)}
+          >
+            {occasion.charAt(0).toUpperCase() + occasion.slice(1)}
+          </Button>
+        ))}
+      </div>
+      {/* Gifts Display */}
+      {filterOccasion
+        ? categorizedGifts[filterOccasion]?.map((gift) => (
+            <div key={gift.id} className="flex justify-between items-center p-2 border-b">
+              <span>
+                {gift.recipient} - ${gift.budget} ({gift.status})
+              </span>
+              <div className="space-x-2">
+                <Button
+                  size="sm"
+                  onClick={() => onEdit(gift)}
+                  className="bg-yellow-500 hover:bg-yellow-600 text-white"
                 >
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => onDelete(gift.id)}
+                  className="bg-red-500 hover:bg-red-600 text-white"
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          ))
+        : occasions.map((occasion) => (
+            <div key={occasion} className="mb-4">
+              <h3 className="text-md font-semibold capitalize">{occasion}</h3>
+              {categorizedGifts[occasion].map((gift) => (
+                <div key={gift.id} className="flex justify-between items-center p-2 border-b">
                   <span>
                     {gift.recipient} - ${gift.budget} ({gift.status})
                   </span>
-                  <div>
-                    <Button size="sm" onClick={() => onEdit(gift)} className="mr-2">
+                  <div className="space-x-2">
+                    <Button
+                      size="sm"
+                      onClick={() => onEdit(gift)}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                    >
                       Edit
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => onDelete(gift.id)}>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => onDelete(gift.id)}
+                      className="bg-red-500 hover:bg-red-600 text-white"
+                    >
                       Delete
                     </Button>
                   </div>
-                </li>
+                </div>
               ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <p>No gifts added yet.</p>
-    )}
-      </Card>
-    )}
-    </> 
+            </div>
+          ))}
+    </Card>
   );
 };
 
@@ -143,17 +189,11 @@ const Summary = ({ gifts, totalBudget }) => {
     .reduce((sum, gift) => sum + gift.budget, 0);
 
   return (
-    <Card className="p-4 bg-gray-100 rounded-lg shadow">
-      <h2 className="text-lg font-semibold mb-4">Summary</h2>
-      <div className="flex justify-between">
-        <div>
-          <p>Total Gifts: {totalGifts}</p>
-          <p>Total Budget: ${totalBudget.toFixed(2)}</p>
-        </div>
-        <div>
-          <p>Budget Used: ${budgetUsed.toFixed(2)}</p>
-        </div>
-      </div>
+    <Card className="p-4 bg-green-100 rounded-lg shadow w-full">
+      <h2 className="text-md font-semibold mb-2 w-full">Summary</h2>
+      <p>Total Gifts: {totalGifts}</p>
+      <p>Total Budget: ${totalBudget.toFixed(2)}</p>
+      <p>Budget Used: ${budgetUsed.toFixed(2)}</p>
     </Card>
   );
 };
@@ -164,17 +204,15 @@ const ProgressTracker = ({ gifts }) => {
   const progress = totalCount > 0 ? (purchasedCount / totalCount) * 100 : 0;
 
   return (
-    <Card className="p-4 bg-white shadow rounded-lg">
-      <h2 className="text-lg font-semibold mb-4">Purchase Progress</h2>
+    <Card className="p-4 bg-white shadow rounded-lg w-full">
+      <h2 className="text-md font-semibold mb-2">Purchase Progress</h2>
       <div className="h-2 bg-gray-200 rounded">
         <div
           className="h-full bg-blue-500 rounded"
           style={{ width: `${progress}%` }}
         ></div>
       </div>
-      <p className="mt-2 text-sm">
-        {purchasedCount} of {totalCount} gifts purchased ({progress.toFixed(2)}%)
-      </p>
+      <p className="mt-2 text-sm">{progress.toFixed(2)}% completed</p>
     </Card>
   );
 };
@@ -182,6 +220,8 @@ const ProgressTracker = ({ gifts }) => {
 export default function App() {
   const [gifts, setGifts] = useState([]);
   const [editingGift, setEditingGift] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [filterOccasion, setFilterOccasion] = useState(""); // Filter state
   const totalBudget = 500; // Example total budget
 
   const handleSave = (gift) => {
@@ -191,44 +231,55 @@ export default function App() {
         : [...prevGifts, { ...gift, id: Date.now() }]
     );
     setEditingGift(null);
+    setDialogOpen(false); // Close modal on save
   };
 
   const handleDelete = (id) => {
     setGifts((prevGifts) => prevGifts.filter((gift) => gift.id !== id));
   };
 
-  const budgetUsed = gifts
-    .filter((gift) => gift.status === "Purchased")
-    .reduce((sum, gift) => sum + gift.budget, 0);
-
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">Gift Shopping Organizer</h1>
-      <div className="grid gap-6">
-        <div>
-          {editingGift ? (
+    <div className="container mx-auto p-6 max-w-6xl grid grid-cols-3 gap-6">
+      <div className="col-span-2 space-y-6">
+        <CategorizedGiftList
+          gifts={gifts}
+          onEdit={(gift) => {
+            setEditingGift(gift);
+            setDialogOpen(true);
+          }}
+          onDelete={handleDelete}
+          filterOccasion={filterOccasion}
+          setFilterOccasion={setFilterOccasion}
+        />
+        <Button
+          className="w-[150px] py-2 px-4 text-sm bg-blue-500 hover:bg-blue-600 text-white mx-auto"
+          onClick={() => {
+            setEditingGift(null);
+            setDialogOpen(true);
+          }}
+        >
+          Add Gift
+        </Button>
+      </div>
+      <div className="space-y-6">
+        <Summary gifts={gifts} totalBudget={totalBudget} />
+        <ProgressTracker gifts={gifts} />
+      </div>
+      {dialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md mx-auto relative">
             <GiftForm
               gift={editingGift}
               onSave={handleSave}
-              onCancel={() => setEditingGift(null)}
+              onCancel={() => setDialogOpen(false)}
               totalBudget={totalBudget}
-              budgetUsed={budgetUsed}
+              budgetUsed={gifts
+                .filter((gift) => gift.status === "Purchased")
+                .reduce((sum, gift) => sum + gift.budget, 0)}
             />
-          ) : (
-            <Button
-              onClick={() =>
-                setEditingGift({ id: null, recipient: "", occasion: "", budget: "", status: "Pending" })
-              }
-              className="bg-blue-500 hover:bg-blue-600 text-white"
-            >
-              Add New Gift
-            </Button>
-          )}
+          </div>
         </div>
-        <Summary gifts={gifts} totalBudget={totalBudget} />
-        <ProgressTracker gifts={gifts} />
-        <CategorizedGiftList gifts={gifts} onEdit={setEditingGift} onDelete={handleDelete} />
-      </div>
+      )}
     </div>
   );
 }

@@ -3,9 +3,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-const QuizCreator = ({ onSave }) => {
-  const [quizTitle, setQuizTitle] = useState("");
-  const [questions, setQuestions] = useState([]);
+const QuizCreator = ({ onSave, existingQuiz }) => {
+  const [quizTitle, setQuizTitle] = useState(existingQuiz?.title || "");
+  const [questions, setQuestions] = useState(existingQuiz?.questions || []);
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
   const [correctAnswer, setCorrectAnswer] = useState("");
@@ -35,7 +35,7 @@ const QuizCreator = ({ onSave }) => {
 
   const handleSaveQuiz = () => {
     if (quizTitle.trim() && questions.length) {
-      onSave({ title: quizTitle, questions });
+      onSave({ id: existingQuiz?.id || Date.now(), title: quizTitle, questions });
       setQuizTitle("");
       setQuestions([]);
     }
@@ -43,12 +43,15 @@ const QuizCreator = ({ onSave }) => {
 
   return (
     <Card className="p-6 space-y-4 bg-blue-50 shadow-lg rounded-lg">
-      <h2 className="text-2xl font-semibold">Create a New Quiz</h2>
+      <h2 className="text-2xl font-semibold">
+        {existingQuiz ? "Edit Quiz" : "Create a New Quiz"}
+      </h2>
       <Input
         placeholder="Quiz Title"
         value={quizTitle}
         onChange={(e) => setQuizTitle(e.target.value)}
         className="w-full"
+        disabled={!!existingQuiz} // Disable editing the title for existing quizzes
       />
       <Input
         placeholder="Question"
@@ -122,29 +125,38 @@ const QuizAttempt = ({ quiz, onComplete }) => {
       {!showResults ? (
         <>
           <h2 className="text-xl font-semibold">{quiz.title}</h2>
-          <p className="text-lg font-medium">{quiz.questions[currentIndex].question}</p>
-          {quiz.questions[currentIndex].options.map((opt) => (
-            <label
-              key={opt}
-              className={`block p-2 rounded ${
-                answers[quiz.questions[currentIndex].id] === opt ? "bg-gray-200" : ""
-              }`}
-            >
-              <input
-                type="radio"
-                name={quiz.questions[currentIndex].id}
-                value={opt}
-                checked={answers[quiz.questions[currentIndex].id] === opt}
-                onChange={() => handleAnswerChange(opt)}
-              />
-              {opt}
-            </label>
-          ))}
+          {/* Display only the current question */}
+          <div key={quiz.questions[currentIndex].id}>
+            <p className="text-lg font-medium">
+              {quiz.questions[currentIndex].question}
+            </p>
+            {quiz.questions[currentIndex].options.map((opt) => (
+              <label
+                key={opt}
+                className={`block p-2 rounded ${
+                  answers[quiz.questions[currentIndex].id] === opt
+                    ? "bg-gray-200"
+                    : ""
+                }`}
+              >
+                <input
+                  type="radio"
+                  name={quiz.questions[currentIndex].id}
+                  value={opt}
+                  checked={answers[quiz.questions[currentIndex].id] === opt}
+                  onChange={() => handleAnswerChange(opt)}
+                />
+                {opt}
+              </label>
+            ))}
+          </div>
           <Button
             onClick={handleNext}
-            className="bg-blue-500 hover:bg-blue-600"
+            className="bg-blue-500 hover:bg-blue-600 mt-4"
           >
-            {currentIndex === quiz.questions.length - 1 ? "Submit Quiz" : "Next Question"}
+            {currentIndex === quiz.questions.length - 1
+              ? "Submit Quiz"
+              : "Next Question"}
           </Button>
         </>
       ) : (
@@ -161,10 +173,12 @@ const QuizAttempt = ({ quiz, onComplete }) => {
             >
               <p className="font-medium">{question.question}</p>
               <p>
-                <span className="font-semibold">Your Answer:</span> {answers[question.id]}
+                <span className="font-semibold">Your Answer:</span>{" "}
+                {answers[question.id]}
               </p>
               <p className="text-green-700">
-                <span className="font-semibold">Correct Answer:</span> {question.correctAnswer}
+                <span className="font-semibold">Correct Answer:</span>{" "}
+                {question.correctAnswer}
               </p>
             </div>
           ))}
@@ -180,12 +194,19 @@ const QuizAttempt = ({ quiz, onComplete }) => {
   );
 };
 
+
 const App = () => {
   const [quizzes, setQuizzes] = useState([]);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const [editingQuiz, setEditingQuiz] = useState(null);
 
   const handleSaveQuiz = (quiz) => {
-    setQuizzes([...quizzes, { ...quiz, id: Date.now() }]);
+    setQuizzes((prev) =>
+      prev.some((q) => q.id === quiz.id)
+        ? prev.map((q) => (q.id === quiz.id ? quiz : q))
+        : [...prev, quiz]
+    );
+    setEditingQuiz(null);
   };
 
   return (
@@ -193,6 +214,8 @@ const App = () => {
       <h1 className="text-3xl font-bold text-center mb-6">Trivia Quiz Creator</h1>
       {selectedQuiz ? (
         <QuizAttempt quiz={selectedQuiz} onComplete={() => setSelectedQuiz(null)} />
+      ) : editingQuiz ? (
+        <QuizCreator existingQuiz={editingQuiz} onSave={handleSaveQuiz} />
       ) : (
         <>
           <QuizCreator onSave={handleSaveQuiz} />
@@ -200,12 +223,20 @@ const App = () => {
             {quizzes.map((quiz) => (
               <Card key={quiz.id} className="p-4 shadow-md">
                 <h3 className="text-lg font-semibold">{quiz.title}</h3>
-                <Button
-                  onClick={() => setSelectedQuiz(quiz)}
-                  className="bg-blue-500 hover:bg-blue-600 mt-2"
-                >
-                  Attempt Quiz
-                </Button>
+                <div className="flex justify-between mt-2">
+                  <Button
+                    onClick={() => setSelectedQuiz(quiz)}
+                    className="bg-blue-500 hover:bg-blue-600"
+                  >
+                    Attempt Quiz
+                  </Button>
+                  <Button
+                    onClick={() => setEditingQuiz(quiz)}
+                    className="bg-yellow-500 hover:bg-yellow-600"
+                  >
+                    Add Questions
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>
